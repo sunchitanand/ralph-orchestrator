@@ -1,0 +1,20 @@
+event_loop:
+  completion_promise: LOOP_COMPLETE
+  max_iterations: 50
+  max_runtime_seconds: 7200
+  starting_event: work.start
+
+cli:
+  backend: kiro
+
+core:
+  specs_dir: .ralph/specs/
+
+backpressure:
+  gates:
+    - name: build
+      command: npm run build --prefix frontend/ralph-web
+      on_fail: "TypeScript/build errors found. Fix all errors before proceeding."
+    - name: test
+      command: npm test --prefix frontend/ralph-web
+      on_fail: "Frontend tests failed. Fix failing tests before proceeding."
