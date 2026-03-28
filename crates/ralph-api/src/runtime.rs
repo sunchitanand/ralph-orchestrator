@@ -99,7 +99,8 @@ impl RpcRuntime {
     pub fn health_payload(&self) -> Value {
         json!({
             "status": "ok",
-            "timestamp": crate::loop_support::now_ts()
+            "timestamp": crate::loop_support::now_ts(),
+            "workspaceRoot": self.config.workspace_root.display().to_string()
         })
     }
 

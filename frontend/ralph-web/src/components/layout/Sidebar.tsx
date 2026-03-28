@@ -6,10 +6,12 @@
  * Navigation items use React Router NavLink for proper routing.
  */
 
-import { ListTodo, PanelLeftClose, PanelLeft, Workflow, Settings } from "lucide-react";
+import { ListTodo, PanelLeftClose, PanelLeft, Workflow, Settings, FolderOpen } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { useUIStore } from "@/store";
 import { cn } from "@/lib/utils";
+import { rpcCall } from "@/rpc/client";
+import { useEffect, useState } from "react";
 
 /** Ralph hat logo matching favicon */
 function RalphLogo({ className }: { className?: string }) {
@@ -41,6 +43,15 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar } = useUIStore();
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null);
+
+  useEffect(() => {
+    rpcCall<{ workspaceRoot?: string }>("system.health")
+      .then((r) => setWorkspacePath(r.workspaceRoot ?? null))
+      .catch(() => {});
+  }, []);
+
+  const workspaceName = workspacePath?.split("/").pop() ?? null;
 
   return (
     <aside
@@ -66,6 +77,26 @@ export function Sidebar() {
           </span>
         )}
       </div>
+
+      {/* Workspace indicator */}
+      {workspacePath && (
+        <div
+          className={cn(
+            "px-3 py-2 border-b border-border",
+            !sidebarOpen && "flex justify-center"
+          )}
+          title={workspacePath}
+        >
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{workspaceName}</span>
+            </div>
+          ) : (
+            <FolderOpen className="h-4 w-4 text-muted-foreground" title={workspacePath} />
+          )}
+        </div>
+      )}
 
       {/* Navigation items */}
       <nav className="flex-1 p-2 space-y-1">
