@@ -165,6 +165,12 @@ function useRpcUtils() {
       list: {
         invalidate: () => invalidatePrefix("preset", "preset.list"),
       },
+      get: {
+        invalidate: (input?: unknown) =>
+          input === undefined
+            ? invalidatePrefix("preset", "preset.get")
+            : invalidateExact("preset", "preset.get", input),
+      },
     },
     collection: {
       list: {
@@ -432,6 +438,11 @@ export const trpc = {
       method: "preset.list",
       mapInput: () => ({}),
       mapResult: (result) => result.presets ?? [],
+    }),
+
+    get: createQueryProcedure<{ id: string }, { yaml: string }, { yaml: string }>({
+      scope: "preset",
+      method: "preset.get",
     }),
   },
 

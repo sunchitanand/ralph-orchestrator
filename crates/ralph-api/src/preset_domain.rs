@@ -6,6 +6,7 @@ use serde_yaml::Value;
 use tracing::warn;
 
 use crate::collection_domain::CollectionSummary;
+use crate::errors::ApiError;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +30,11 @@ impl PresetDomain {
         Self {
             workspace_root: workspace_root.as_ref().to_path_buf(),
         }
+    }
+
+    pub fn get(&self, id: &str) -> Result<String, ApiError> {
+        read_preset_yaml(&self.workspace_root, id)
+            .map_err(|msg| ApiError::not_found(msg))
     }
 
     pub fn list(&self, collections: &[CollectionSummary]) -> Vec<PresetRecord> {
@@ -133,6 +139,28 @@ fn read_presets_from_dir(dir: &Path, source: &str, include_path: bool) -> Vec<Pr
         .collect()
 }
 
+/// Read the full YAML content for a preset by id.
+///
+/// Id formats:
+/// - `builtin:{name}` → reads `presets/{name}.yml`
+/// - `directory:{name}` → reads `.ralph/hats/{name}.yml`
+/// - `collection:{id}` → not handled here (caller delegates to collection.export)
+pub fn read_preset_yaml(workspace_root: &Path, id: &str) -> Result<String, String> {
+    let (source, name) = id
+        .split_once(':')
+        .ok_or_else(|| format!("invalid preset id: {id}"))?;
+
+    let path = match source {
+        "builtin" => workspace_root.join("presets").join(format!("{name}.yml")),
+        "directory" => workspace_root.join(".ralph/hats").join(format!("{name}.yml")),
+        "collection" => return Err("collection presets must use collection.export".to_string()),
+        _ => return Err(format!("unknown preset source: {source}")),
+    };
+
+    std::fs::read_to_string(&path)
+        .map_err(|e| format!("failed to read preset '{}': {e}", path.display()))
+}
+
 fn read_preset_description(path: &Path) -> Option<String> {
     let content = std::fs::read_to_string(path).ok()?;
     let parsed: Value = match serde_yaml::from_str(&content) {
@@ -148,4 +176,64 @@ fn read_preset_description(path: &Path) -> Option<String> {
         .and_then(|mapping| mapping.get(Value::String("description".to_string())))
         .and_then(Value::as_str)
         .map(std::string::ToString::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn setup_workspace() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        let presets_dir = dir.path().join("presets");
+        fs::create_dir_all(&presets_dir).unwrap();
+        fs::write(presets_dir.join("debug.yml"), "name: debug\nhats: {}").unwrap();
+
+        let hats_dir = dir.path().join(".ralph/hats");
+        fs::create_dir_all(&hats_dir).unwrap();
+        fs::write(hats_dir.join("custom.yml"), "name: custom\nhats: {}").unwrap();
+
+        dir
+    }
+
+    #[test]
+    fn get_builtin_preset_returns_yaml() {
+        let ws = setup_workspace();
+        let domain = PresetDomain::new(ws.path());
+        let yaml = domain.get("builtin:debug").unwrap();
+        assert!(yaml.contains("name: debug"));
+    }
+
+    #[test]
+    fn get_directory_preset_returns_yaml() {
+        let ws = setup_workspace();
+        let domain = PresetDomain::new(ws.path());
+        let yaml = domain.get("directory:custom").unwrap();
+        assert!(yaml.contains("name: custom"));
+    }
+
+    #[test]
+    fn get_collection_preset_returns_error() {
+        let ws = setup_workspace();
+        let domain = PresetDomain::new(ws.path());
+        let err = domain.get("collection:some-id").unwrap_err();
+        assert!(err.message.contains("collection.export"));
+    }
+
+    #[test]
+    fn get_missing_preset_returns_error() {
+        let ws = setup_workspace();
+        let domain = PresetDomain::new(ws.path());
+        let err = domain.get("builtin:nonexistent").unwrap_err();
+        assert!(err.message.contains("failed to read"));
+    }
+
+    #[test]
+    fn get_invalid_id_returns_error() {
+        let ws = setup_workspace();
+        let domain = PresetDomain::new(ws.path());
+        let err = domain.get("nocolon").unwrap_err();
+        assert!(err.message.contains("invalid preset id"));
+    }
 }

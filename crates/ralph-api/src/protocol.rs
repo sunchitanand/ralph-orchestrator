@@ -49,6 +49,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "config.get",
     "config.update",
     "preset.list",
+    "preset.get",
     "collection.list",
     "collection.get",
     "collection.create",

@@ -54,6 +54,7 @@
         "config.get",
         "config.update",
         "preset.list",
+        "preset.get",
         "collection.list",
         "collection.get",
         "collection.create",
@@ -741,6 +742,7 @@
         { "properties": { "method": { "const": "config.update" }, "params": { "$ref": "#/$defs/configUpdateParams" } }, "required": ["method", "params"] },
 
         { "properties": { "method": { "const": "preset.list" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
+        { "properties": { "method": { "const": "preset.get" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
 
         { "properties": { "method": { "const": "collection.list" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
         { "properties": { "method": { "const": "collection.get" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
@@ -1053,6 +1055,7 @@
         { "properties": { "method": { "const": "config.update" }, "result": { "$ref": "#/$defs/configUpdateResult" } }, "required": ["method", "result"] },
 
         { "properties": { "method": { "const": "preset.list" }, "result": { "$ref": "#/$defs/presetListResult" } }, "required": ["method", "result"] },
+        { "properties": { "method": { "const": "preset.get" }, "result": { "$ref": "#/$defs/collectionExportResult" } }, "required": ["method", "result"] },
 
         { "properties": { "method": { "const": "collection.list" }, "result": { "$ref": "#/$defs/collectionListResult" } }, "required": ["method", "result"] },
         { "properties": { "method": { "const": "collection.get" }, "result": { "$ref": "#/$defs/collectionResult" } }, "required": ["method", "result"] },

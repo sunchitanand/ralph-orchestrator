@@ -267,6 +267,17 @@ impl RpcRuntime {
                 let presets = self.preset_domain().list(&collections);
                 Ok(json!({ "presets": presets }))
             }
+            "preset.get" => {
+                let params: IdOnlyParams = self.parse_params(request)?;
+                if params.id.starts_with("collection:") {
+                    let collection_id = params.id.strip_prefix("collection:").unwrap();
+                    let yaml = self.collection_domain_mut()?.export(collection_id)?;
+                    Ok(json!({ "yaml": yaml }))
+                } else {
+                    let yaml = self.preset_domain().get(&params.id)?;
+                    Ok(json!({ "yaml": yaml }))
+                }
+            }
             _ => Err(ApiError::service_unavailable(format!(
                 "method '{}' is recognized but not implemented",
                 request.method
