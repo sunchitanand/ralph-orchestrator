@@ -404,23 +404,74 @@ async fn forward_output(
     let _ = tokio::join!(stdout_task, stderr_task);
 }
 
+/// Resolve the ralph-orchestrator source tree root.
+///
+/// Checks (in order):
+/// 1. `RALPH_SOURCE_ROOT` env var
+/// 2. Walk up from the current executable to find `frontend/ralph-web/package.json`
+/// 3. Current working directory (original behaviour — works when run from source checkout)
+fn resolve_source_root() -> Result<PathBuf> {
+    // 1. Explicit env var
+    if let Ok(root) = env::var("RALPH_SOURCE_ROOT") {
+        let p = PathBuf::from(&root);
+        if p.join("frontend/ralph-web/package.json").exists() {
+            return p
+                .canonicalize()
+                .with_context(|| format!("Invalid RALPH_SOURCE_ROOT: {root}"));
+        }
+        anyhow::bail!(
+            "RALPH_SOURCE_ROOT={root} does not contain frontend/ralph-web/package.json"
+        );
+    }
+
+    // 2. Walk up from executable location
+    if let Ok(exe) = env::current_exe() {
+        let mut dir = exe.as_path().parent();
+        while let Some(d) = dir {
+            if d.join("frontend/ralph-web/package.json").exists() {
+                return d
+                    .canonicalize()
+                    .context("Failed to canonicalize source root");
+            }
+            dir = d.parent();
+        }
+    }
+
+    // 3. Fall back to cwd (works when run from source checkout)
+    let cwd = env::current_dir().context("Failed to get current directory")?;
+    if cwd.join("frontend/ralph-web/package.json").exists() {
+        return Ok(cwd);
+    }
+
+    anyhow::bail!(
+        "Could not locate the ralph-orchestrator source tree.\n\
+         The web dashboard requires the frontend source code.\n\n\
+         Either:\n  \
+         1. Run `ralph web` from the ralph-orchestrator source checkout, or\n  \
+         2. Set RALPH_SOURCE_ROOT to the checkout path:\n     \
+            export RALPH_SOURCE_ROOT=/path/to/ralph-orchestrator"
+    )
+}
+
 /// Run both backend and frontend dev servers in parallel
 pub async fn execute(args: WebArgs) -> Result<()> {
     println!("Starting Ralph web servers...");
 
-    // Determine workspace root: explicit flag or current directory
+    // Resolve source tree (where frontend/ and backend/ live)
+    let source_root = resolve_source_root()?;
+
+    // Determine workspace root: explicit flag, or current directory
     let workspace_root = match args.workspace {
         Some(path) => {
-            // Canonicalize to get absolute path
             path.canonicalize()
                 .with_context(|| format!("Invalid workspace path: {}", path.display()))?
         }
         None => env::current_dir().context("Failed to get current directory")?,
     };
 
-    // Compute absolute paths for backend and frontend directories
-    let backend_dir = workspace_root.join("backend/ralph-web-server");
-    let frontend_dir = workspace_root.join("frontend/ralph-web");
+    // Frontend/backend dirs come from the source tree, NOT the workspace
+    let backend_dir = source_root.join("backend/ralph-web-server");
+    let frontend_dir = source_root.join("frontend/ralph-web");
 
     if args.legacy_node_api && !backend_dir.join("package.json").exists() {
         anyhow::bail!(
@@ -430,13 +481,14 @@ pub async fn execute(args: WebArgs) -> Result<()> {
     }
 
     // Verify frontend Node.js/npm tooling, install deps, and legacy tsx checks when requested.
-    preflight(&workspace_root, &backend_dir, args.legacy_node_api).await?;
+    preflight(&source_root, &backend_dir, args.legacy_node_api).await?;
 
     // Check ports before spawning anything
     check_port_available(args.backend_port)?;
     check_port_available(args.frontend_port)?;
 
     println!("Using workspace: {}", workspace_root.display());
+    println!("Using source:    {}", source_root.display());
 
     // Spawn backend (default Rust RPC API, optional legacy Node backend) and frontend.
     let backend_label = if args.legacy_node_api {
@@ -469,7 +521,7 @@ pub async fn execute(args: WebArgs) -> Result<()> {
     } else {
         AsyncCommand::new("cargo")
             .args(["run", "-p", "ralph-api"])
-            .current_dir(&workspace_root)
+            .current_dir(&source_root)
             .env("RALPH_API_PORT", args.backend_port.to_string())
             .env("RALPH_API_WORKSPACE_ROOT", &workspace_root)
             .stdout(std::process::Stdio::piped())
