@@ -18,6 +18,10 @@ interface UIState {
   expandedTasks: Set<string>;
   toggleTaskExpanded: (taskId: string) => void;
   setTaskExpanded: (taskId: string, expanded: boolean) => void;
+
+  // Active project (null = default workspace)
+  activeProjectId: string | null;
+  setActiveProjectId: (id: string | null) => void;
 }
 
 /**
@@ -34,6 +38,10 @@ export const useUIStore = create<UIState>()(
 
       // Task expansion state (Set serialized as array)
       expandedTasks: new Set<string>(),
+
+      // Active project
+      activeProjectId: null,
+      setActiveProjectId: (id) => set({ activeProjectId: id }),
       toggleTaskExpanded: (taskId) =>
         set((state) => {
           const next = new Set(state.expandedTasks);

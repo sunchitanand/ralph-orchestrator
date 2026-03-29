@@ -1,5 +1,6 @@
 mod dispatch;
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
@@ -20,6 +21,7 @@ use crate::idempotency::{
 use crate::loop_domain::LoopDomain;
 use crate::planning_domain::PlanningDomain;
 use crate::preset_domain::PresetDomain;
+use crate::project_domain::ProjectRegistry;
 use crate::protocol::{
     API_VERSION, KNOWN_METHODS, RpcRequestEnvelope, STREAM_TOPICS, error_envelope, is_known_method,
     is_mutating_method, parse_json_value, parse_request, request_context, success_envelope,
@@ -42,6 +44,16 @@ pub(crate) struct TaskCancelParams {
 }
 
 #[derive(Clone)]
+pub struct ProjectDomains {
+    pub tasks: Arc<Mutex<TaskDomain>>,
+    pub loops: Arc<Mutex<LoopDomain>>,
+    pub planning: Arc<Mutex<PlanningDomain>>,
+    pub collections: Arc<Mutex<CollectionDomain>>,
+    pub config: ConfigDomain,
+    pub preset: PresetDomain,
+}
+
+#[derive(Clone)]
 pub struct RpcRuntime {
     pub(crate) config: ApiConfig,
     auth: Arc<dyn Authenticator>,
@@ -53,6 +65,8 @@ pub struct RpcRuntime {
     streams: StreamDomain,
     config_domain: ConfigDomain,
     preset_domain: PresetDomain,
+    projects: Arc<Mutex<ProjectRegistry>>,
+    project_domains: Arc<Mutex<HashMap<String, ProjectDomains>>>,
 }
 
 enum ExecutionOutcome {
@@ -91,6 +105,9 @@ impl RpcRuntime {
         let streams = StreamDomain::new();
         let config_domain = ConfigDomain::new(&config.workspace_root);
         let preset_domain = PresetDomain::new(&config.workspace_root);
+        let projects = Arc::new(Mutex::new(ProjectRegistry::new(
+            config.project_store_path.clone().unwrap_or_else(ProjectRegistry::default_path),
+        )));
 
         Self {
             config,
@@ -103,6 +120,8 @@ impl RpcRuntime {
             streams,
             config_domain,
             preset_domain,
+            projects,
+            project_domains: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -213,42 +232,66 @@ impl RpcRuntime {
             .map_err(|error| error.with_context("ws-upgrade", Some("stream.subscribe".to_string())))
     }
 
-    pub(crate) fn task_domain_mut(&self) -> Result<MutexGuard<'_, TaskDomain>, ApiError> {
-        self.tasks
-            .lock()
-            .map_err(|_| ApiError::internal("task domain lock poisoned"))
-    }
-
-    pub(crate) fn loop_domain_mut(&self) -> Result<MutexGuard<'_, LoopDomain>, ApiError> {
-        self.loops
-            .lock()
-            .map_err(|_| ApiError::internal("loop domain lock poisoned"))
-    }
-
-    pub(crate) fn planning_domain_mut(&self) -> Result<MutexGuard<'_, PlanningDomain>, ApiError> {
-        self.planning
-            .lock()
-            .map_err(|_| ApiError::internal("planning domain lock poisoned"))
-    }
-
-    pub(crate) fn collection_domain_mut(
-        &self,
-    ) -> Result<MutexGuard<'_, CollectionDomain>, ApiError> {
-        self.collections
-            .lock()
-            .map_err(|_| ApiError::internal("collection domain lock poisoned"))
-    }
-
     pub(crate) fn stream_domain(&self) -> StreamDomain {
         self.streams.clone()
     }
 
-    pub(crate) fn config_domain(&self) -> &ConfigDomain {
-        &self.config_domain
+    pub(crate) fn project_registry_mut(
+        &self,
+    ) -> Result<MutexGuard<'_, ProjectRegistry>, ApiError> {
+        self.projects
+            .lock()
+            .map_err(|_| ApiError::internal("project registry lock poisoned"))
     }
 
-    pub(crate) fn preset_domain(&self) -> &PresetDomain {
-        &self.preset_domain
+    pub fn resolve_project_domains(
+        &self,
+        project_id: Option<&str>,
+    ) -> Result<ProjectDomains, ApiError> {
+        match project_id {
+            None | Some("default") => Ok(ProjectDomains {
+                tasks: Arc::clone(&self.tasks),
+                loops: Arc::clone(&self.loops),
+                planning: Arc::clone(&self.planning),
+                collections: Arc::clone(&self.collections),
+                config: self.config_domain.clone(),
+                preset: self.preset_domain.clone(),
+            }),
+            Some(id) => {
+                let mut cache = self
+                    .project_domains
+                    .lock()
+                    .map_err(|_| ApiError::internal("project domains lock poisoned"))?;
+
+                if let Some(domains) = cache.get(id) {
+                    return Ok(domains.clone());
+                }
+
+                let workspace_root = {
+                    let registry = self.project_registry_mut()?;
+                    let project = registry
+                        .get(id)
+                        .ok_or_else(|| ApiError::not_found(format!("project '{id}' not found")))?;
+                    project.path.clone()
+                };
+
+                let domains = ProjectDomains {
+                    tasks: Arc::new(Mutex::new(TaskDomain::new(&workspace_root))),
+                    loops: Arc::new(Mutex::new(LoopDomain::new(
+                        &workspace_root,
+                        self.config.loop_process_interval_ms,
+                        self.config.ralph_command.clone(),
+                    ))),
+                    planning: Arc::new(Mutex::new(PlanningDomain::new(&workspace_root))),
+                    collections: Arc::new(Mutex::new(CollectionDomain::new(&workspace_root))),
+                    config: ConfigDomain::new(&workspace_root),
+                    preset: PresetDomain::new(&workspace_root),
+                };
+
+                cache.insert(id.to_string(), domains.clone());
+                Ok(domains)
+            }
+        }
     }
 
     pub(crate) fn parse_params<T>(&self, request: &RpcRequestEnvelope) -> Result<T, ApiError>

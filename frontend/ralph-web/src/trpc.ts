@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey, type UseMutationOptions, type UseQueryOptions } from "@tanstack/react-query";
 import { RpcClientError, rpcCall } from "./rpc/client";
+import { useUIStore } from "./store";
 
 type QueryOptions<TResult = any> = Omit<UseQueryOptions<TResult, RpcClientError>, "queryKey" | "queryFn">;
 type MutationOptions<TResult = any, TInput = any> = Omit<UseMutationOptions<TResult, RpcClientError, TInput>, "mutationFn">;
@@ -14,8 +15,8 @@ interface MutationProcedure<TInput, TResult = any> {
 
 const QUERY_NAMESPACE = "rpc-v1";
 
-function keyFor(scope: string, method: string, input?: unknown): QueryKey {
-  return [QUERY_NAMESPACE, scope, method, input ?? null] as const;
+function keyFor(scope: string, method: string, input?: unknown, projectId?: string | null): QueryKey {
+  return [QUERY_NAMESPACE, scope, method, input ?? null, projectId ?? null] as const;
 }
 
 function prefixFor(scope: string, method: string): QueryKey {
@@ -29,19 +30,21 @@ function createQueryProcedure<TInput, TRpcResult, TResult>(config: {
   mapResult?: (result: TRpcResult, input?: TInput) => TResult;
 }): QueryProcedure<TInput, TResult> {
   return {
-    useQuery: (input?: TInput, options?: QueryOptions<TResult>) =>
-      useQuery<TResult, RpcClientError>({
-        queryKey: keyFor(config.scope, config.method, input),
+    useQuery: (input?: TInput, options?: QueryOptions<TResult>) => {
+      const activeProjectId = useUIStore((s) => s.activeProjectId);
+      return useQuery<TResult, RpcClientError>({
+        queryKey: keyFor(config.scope, config.method, input, activeProjectId),
         queryFn: async () => {
           const params = config.mapInput ? config.mapInput(input) : ((input as unknown) ?? {});
-          const result = await rpcCall<TRpcResult>(config.method, params, { mutating: false });
+          const result = await rpcCall<TRpcResult>(config.method, params, { mutating: false, projectId: activeProjectId ?? undefined });
           if (config.mapResult) {
             return config.mapResult(result, input);
           }
           return result as unknown as TResult;
         },
         ...(options ?? {}),
-      }),
+      });
+    },
   };
 }
 
@@ -54,8 +57,9 @@ function createMutationProcedure<TInput, TRpcResult, TResult>(config: {
     useMutation: (options?: MutationOptions<TResult, TInput>) =>
       useMutation<TResult, RpcClientError, TInput>({
         mutationFn: async (input: TInput) => {
+          const activeProjectId = useUIStore.getState().activeProjectId;
           const params = config.mapInput ? config.mapInput(input) : (input as unknown);
-          const result = await rpcCall<TRpcResult>(config.method, params);
+          const result = await rpcCall<TRpcResult>(config.method, params, { projectId: activeProjectId ?? undefined });
           if (config.mapResult) {
             return config.mapResult(result, input);
           }
@@ -66,9 +70,10 @@ function createMutationProcedure<TInput, TRpcResult, TResult>(config: {
   };
 }
 
-async function listLoopsWithMergeState(input?: { includeTerminal?: boolean }) {
+async function listLoopsWithMergeState(input?: { includeTerminal?: boolean }, projectId?: string) {
   const result = await rpcCall<{ loops: Array<Record<string, unknown>> }>("loop.list", input ?? {}, {
     mutating: false,
+    projectId,
   });
 
   const loops = result.loops ?? [];
@@ -85,7 +90,7 @@ async function listLoopsWithMergeState(input?: { includeTerminal?: boolean }) {
         const mergeState = await rpcCall<{ enabled: boolean; reason?: string }>(
           "loop.merge_button_state",
           { id },
-          { mutating: false }
+          { mutating: false, projectId }
         );
 
         return {
@@ -106,13 +111,14 @@ async function listLoopsWithMergeState(input?: { includeTerminal?: boolean }) {
 
 function useRpcUtils() {
   const queryClient = useQueryClient();
+  const activeProjectId = useUIStore((s) => s.activeProjectId);
 
   const invalidatePrefix = (scope: string, method: string) =>
     queryClient.invalidateQueries({ queryKey: prefixFor(scope, method) });
 
   const invalidateExact = (scope: string, method: string, input?: unknown) =>
     queryClient.invalidateQueries({
-      queryKey: keyFor(scope, method, input),
+      queryKey: keyFor(scope, method, input, activeProjectId),
       exact: true,
     });
 
@@ -308,12 +314,14 @@ export const trpc = {
 
   loops: {
     list: {
-      useQuery: ((input?: { includeTerminal?: boolean }, options?: QueryOptions<any[]>) =>
-        useQuery<any[], RpcClientError>({
-          queryKey: keyFor("loop", "loop.list", input),
-          queryFn: () => listLoopsWithMergeState(input),
+      useQuery: ((input?: { includeTerminal?: boolean }, options?: QueryOptions<any[]>) => {
+        const activeProjectId = useUIStore((s) => s.activeProjectId);
+        return useQuery<any[], RpcClientError>({
+          queryKey: keyFor("loop", "loop.list", input, activeProjectId),
+          queryFn: () => listLoopsWithMergeState(input, activeProjectId ?? undefined),
           ...(options ?? {}),
-        })) as any,
+        });
+      }) as any,
     },
 
     managerStatus: createQueryProcedure<void, { running: boolean; intervalMs: number; lastProcessedAt?: string }, {

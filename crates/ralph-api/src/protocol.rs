@@ -58,6 +58,10 @@ pub const KNOWN_METHODS: &[&str] = &[
     "collection.delete",
     "collection.import",
     "collection.export",
+    "project.list",
+    "project.add",
+    "project.remove",
+    "project.browse",
     "stream.subscribe",
     "stream.unsubscribe",
     "stream.ack",
@@ -91,6 +95,8 @@ pub const MUTATING_METHODS: &[&str] = &[
     "collection.update",
     "collection.delete",
     "collection.import",
+    "project.add",
+    "project.remove",
 ];
 
 pub const STREAM_TOPICS: &[&str] = &[

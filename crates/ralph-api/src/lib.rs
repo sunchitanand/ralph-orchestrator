@@ -10,6 +10,7 @@ pub mod loop_support;
 pub mod mcp;
 pub mod planning_domain;
 pub mod preset_domain;
+pub mod project_domain;
 pub mod protocol;
 pub mod runtime;
 pub mod stream_domain;

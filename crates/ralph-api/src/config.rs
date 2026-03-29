@@ -44,6 +44,8 @@ pub struct ApiConfig {
     pub workspace_root: PathBuf,
     pub loop_process_interval_ms: u64,
     pub ralph_command: String,
+    /// Override for project registry store path. When `None`, uses global `~/.ralph/projects.json`.
+    pub project_store_path: Option<PathBuf>,
 }
 
 impl Default for ApiConfig {
@@ -60,6 +62,7 @@ impl Default for ApiConfig {
             workspace_root,
             loop_process_interval_ms: 30_000,
             ralph_command: "ralph".to_string(),
+            project_store_path: None,
         }
     }
 }

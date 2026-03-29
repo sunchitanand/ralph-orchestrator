@@ -28,6 +28,8 @@ const MUTATING_METHODS = new Set<string>([
   "collection.update",
   "collection.delete",
   "collection.import",
+  "project.add",
+  "project.remove",
 ]);
 
 let requestCounter = 0;
@@ -47,10 +49,13 @@ interface RpcResponseEnvelope<TResult> {
   error?: RpcErrorBody;
 }
 
+const PROJECT_SCOPED_PREFIXES = ["task.", "loop.", "config.", "preset.", "collection.", "planning."];
+
 interface RpcCallOptions {
   mutating?: boolean;
   signal?: AbortSignal;
   endpoint?: string;
+  projectId?: string;
 }
 
 export class RpcClientError extends Error {
@@ -119,6 +124,10 @@ export async function rpcCall<TResult>(
     method,
     params: params ?? {},
   };
+
+  if (options.projectId && PROJECT_SCOPED_PREFIXES.some((p) => method.startsWith(p))) {
+    body.params = { ...(body.params as Record<string, unknown>), projectId: options.projectId };
+  }
 
   if (isMutating) {
     body.meta = {
