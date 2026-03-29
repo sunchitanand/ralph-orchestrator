@@ -18,6 +18,7 @@ vi.mock("./pages", () => ({
   BuilderPage: () => <div data-testid="builder-page">Builder Page</div>,
   TaskDetailPage: () => <div data-testid="task-detail-page">Task Detail Page</div>,
   SettingsPage: () => <div data-testid="settings-page">Settings Page</div>,
+  PresetsPage: () => <div data-testid="presets-page">Presets Page</div>,
 }));
 
 // Mock the layout component - must render Outlet for routes to work
@@ -83,6 +84,14 @@ describe("App routing", () => {
       });
     });
 
+    it("renders PresetsPage for /presets route", async () => {
+      renderWithRoute("/presets");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("presets-page")).toBeInTheDocument();
+      });
+    });
+
     it("redirects root to /tasks", async () => {
       renderWithRoute("/");
 
@@ -95,14 +104,14 @@ describe("App routing", () => {
 
 describe("pages barrel export", () => {
   it("exports TaskDetailPage from pages/index.ts", async () => {
-    // Given: The pages barrel export
-
-    // When: We import from pages (bypass the mock)
-    // Use dynamic import with query param to avoid mock
     const pagesModule = await vi.importActual<typeof import("./pages")>("./pages");
-
-    // Then: TaskDetailPage should be exported
     expect(pagesModule.TaskDetailPage).toBeDefined();
     expect(typeof pagesModule.TaskDetailPage).toBe("function");
+  });
+
+  it("exports PresetsPage from pages/index.ts", async () => {
+    const pagesModule = await vi.importActual<typeof import("./pages")>("./pages");
+    expect(pagesModule.PresetsPage).toBeDefined();
+    expect(typeof pagesModule.PresetsPage).toBe("function");
   });
 });
