@@ -12,7 +12,7 @@
  * This is the n8n-style builder the user requested.
  */
 
-import { useCallback, useState, useRef, DragEvent, useMemo } from "react";
+import { useCallback, useState, useRef, useEffect, DragEvent, useMemo } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -22,6 +22,7 @@ import {
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
+  useReactFlow,
   type Node,
   type Edge,
   type EdgeTypes,
@@ -29,6 +30,7 @@ import {
   type OnEdgesChange,
   type OnConnect,
   type NodeTypes,
+  type Viewport,
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -84,6 +86,7 @@ interface CollectionBuilderProps {
  * CollectionBuilder - main workflow canvas component
  */
 function CollectionBuilderInner({
+  collectionId,
   initialData,
   name,
   description,
@@ -98,6 +101,32 @@ function CollectionBuilderInner({
   const [nodes, setNodes] = useState<Node[]>(initialData?.nodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(initialData?.edges ?? []);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const { setViewport } = useReactFlow();
+
+  // Restore viewport from sessionStorage on mount
+  const viewportKey = `ralph-builder-viewport-${collectionId ?? "new"}`;
+  const hasRestoredViewport = useRef(false);
+
+  useEffect(() => {
+    if (hasRestoredViewport.current) return;
+    const saved = sessionStorage.getItem(viewportKey);
+    if (saved) {
+      try {
+        const vp = JSON.parse(saved) as Viewport;
+        setViewport(vp, { duration: 0 });
+        hasRestoredViewport.current = true;
+      } catch { /* ignore */ }
+    }
+  }, [viewportKey, setViewport]);
+
+  // Save viewport on changes
+  const onMoveEnd = useCallback(
+    (_event: unknown, viewport: Viewport) => {
+      hasRestoredViewport.current = true;
+      sessionStorage.setItem(viewportKey, JSON.stringify(viewport));
+    },
+    [viewportKey],
+  );
 
   // Get selected node with data (only hat nodes have editable properties)
   const selectedNode = useMemo(() => {
@@ -287,8 +316,9 @@ function CollectionBuilderInner({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onMoveEnd={onMoveEnd}
             nodeTypes={nodeTypes}
-            fitView
+            fitView={!sessionStorage.getItem(viewportKey)}
             minZoom={0.1}
             maxZoom={4}
             snapToGrid
