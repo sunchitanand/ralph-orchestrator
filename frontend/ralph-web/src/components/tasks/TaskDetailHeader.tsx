@@ -61,11 +61,18 @@ interface StatusConfig {
   badgeClass?: string;
 }
 
-const STATUS_MAP: Record<TaskStatus, StatusConfig> = {
+const STATUS_MAP: Record<string, StatusConfig> = {
   open: {
     label: "Open",
     icon: Circle,
     variant: "secondary",
+  },
+  pending: {
+    label: "Pending",
+    icon: Loader2,
+    variant: "outline",
+    iconClass: "animate-spin",
+    badgeClass: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400",
   },
   running: {
     label: "Running",
@@ -102,7 +109,7 @@ export function TaskDetailHeader({
   isDeletePending = false,
 }: TaskDetailHeaderProps) {
   const actionConfig = getActionForStatus(status);
-  const statusConfig = STATUS_MAP[status];
+  const statusConfig = STATUS_MAP[status] ?? STATUS_MAP.open;
   const StatusIcon = statusConfig.icon;
 
   return (
