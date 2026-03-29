@@ -107,9 +107,9 @@ impl Task {
         format!("task-{}-{}", timestamp, hex_suffix)
     }
 
-    /// Returns true if this task is ready to work on (open + no blockers pending).
+    /// Returns true if this task is ready to work on (open/in-progress + no blockers pending).
     pub fn is_ready(&self, all_tasks: &[Task]) -> bool {
-        if self.status != TaskStatus::Open {
+        if self.status != TaskStatus::Open && self.status != TaskStatus::InProgress {
             return false;
         }
         self.blocked_by.iter().all(|blocker_id| {
@@ -213,12 +213,16 @@ mod tests {
     }
 
     #[test]
-    fn test_is_not_ready_when_not_open() {
+    fn test_is_ready_when_in_progress() {
+        let mut task = Task::new("Test".to_string(), 1);
+        task.status = TaskStatus::InProgress;
+        assert!(task.is_ready(&[]));
+    }
+
+    #[test]
+    fn test_is_not_ready_when_terminal() {
         let mut task = Task::new("Test".to_string(), 1);
         task.status = TaskStatus::Closed;
-        assert!(!task.is_ready(&[]));
-
-        task.status = TaskStatus::InProgress;
         assert!(!task.is_ready(&[]));
 
         task.status = TaskStatus::Failed;
