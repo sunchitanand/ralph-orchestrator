@@ -15,17 +15,27 @@ The Settings page shows a read-only dropdown of presets but nothing more.
 
 ## Acceptance Criteria
 
+Each criterion MUST have a corresponding test in `PresetsPage.test.tsx` that
+verifies the behavior. Do NOT emit LOOP_COMPLETE until all tests exist and pass.
+
 1. A new `/presets` route and `PresetsPage` component exists
+   - TEST: rendering `/presets` shows the PresetsPage component
 2. The page lists all presets returned by `preset.list`, grouped by source
    (`builtin`, `directory`, `collection`)
+   - TEST: mock `preset.list` with mixed sources, verify grouping renders
 3. Each preset card shows: name, description, category/source badge
+   - TEST: verify card renders name, description, and badge
 4. Clicking a preset opens a detail view showing:
    - Metadata (name, description, source, category)
-   - Full YAML content in a syntax-highlighted read-only code block
+   - Full YAML content in a read-only code block (fetched via `preset.get`)
+   - TEST: click a preset card, verify detail view renders with YAML content
 5. Builtin presets have an "Open in Builder" button that imports the YAML into
    a new collection and navigates to `/builder` to edit it
+   - TEST: in detail view for a builtin preset, verify "Open in Builder"
+     button exists and calls `collection.importYaml` on click
 6. The Presets page is accessible from the sidebar nav (between Builder and
    Settings), using the `Library` icon from lucide-react
+   - TEST: verify sidebar contains Presets nav item
 7. Existing tests pass. New components have basic render tests.
 
 ## Out of Scope

@@ -9,6 +9,14 @@ cli:
 
 core:
   specs_dir: .ralph/specs/
+  guardrails:
+    - "NEVER run long-lived server processes in the foreground — they block the loop. Always background with & and kill after testing"
+    - "NEVER use interactive commands that wait for user input"
+    - "PREFER static validation (npx tsc --noEmit, vitest run) over starting servers for testing"
+    - "NEVER run npm run dev, npm start, ralph web, or vite — these are long-running servers that will hang forever"
+    - "Do NOT emit LOOP_COMPLETE until EVERY acceptance criterion in the spec is implemented and verified by tests"
+    - "If the spec says 'clicking X shows Y', there MUST be a test that renders the component and verifies Y appears after clicking X"
+    - "Read the spec acceptance criteria as a checklist — verify each one has a corresponding test before completing"
 
 backpressure:
   gates:
