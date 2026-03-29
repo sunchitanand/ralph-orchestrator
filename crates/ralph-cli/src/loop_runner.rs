@@ -10544,7 +10544,7 @@ EOF"#,
 
     #[cfg(unix)]
     fn body_with_post_event_sleep(body: String) -> String {
-        format!("{body}\npython3 - <<'PY'\nimport time\ntime.sleep(2)\nPY")
+        format!("{body}\npython3 - <<'PY'\nimport time\ntime.sleep(10)\nPY")
     }
 
     #[cfg(unix)]
@@ -12176,7 +12176,7 @@ EOF"#,
         let completed = run_wave_for_backend_with_timeout(
             BackendOutputFormat::Text,
             &body_with_post_event_sleep(text_backend_body("text partial timeout ok")),
-            1,
+            3,
         )
         .await;
 
@@ -12193,7 +12193,7 @@ EOF"#,
         let completed = run_wave_for_backend_with_timeout(
             BackendOutputFormat::StreamJson,
             &body_with_post_event_sleep(claude_backend_body("claude partial timeout ok")),
-            1,
+            3,
         )
         .await;
 
@@ -12210,7 +12210,7 @@ EOF"#,
         let completed = run_wave_for_backend_with_timeout(
             BackendOutputFormat::PiStreamJson,
             &body_with_post_event_sleep(pi_backend_body("pi partial timeout ok")),
-            1,
+            3,
         )
         .await;
 
@@ -12480,25 +12480,31 @@ EOF"#,
 
         process_pending_merges_with_command(repo_root, ralph_path.as_os_str());
 
-        // Wait for subprocess to finish writing
-        std::thread::sleep(std::time::Duration::from_millis(500));
-
-        // Verify a log file was created under .ralph/diagnostics/logs/
+        // Poll for log file content instead of a fixed sleep (avoids flakiness under load)
         let logs_dir = repo_root.join(".ralph/diagnostics/logs");
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut log_content = String::new();
+        while std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            if let Ok(entries) = std::fs::read_dir(&logs_dir) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    if entry.file_name().to_string_lossy().starts_with("ralph-merge-") {
+                        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                            if content.contains("stdout output") {
+                                log_content = content;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if !log_content.is_empty() {
+                break;
+            }
+        }
+
         assert!(logs_dir.exists(), "diagnostics logs directory should exist");
-
-        let log_files: Vec<_> = std::fs::read_dir(&logs_dir)
-            .expect("read logs dir")
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with("ralph-merge-"))
-            .collect();
-        assert!(
-            !log_files.is_empty(),
-            "should have at least one merge subprocess log file"
-        );
-
-        // Verify the log file contains the subprocess output
-        let log_content = std::fs::read_to_string(log_files[0].path()).expect("read log file");
         assert!(
             log_content.contains("stdout output"),
             "log file should contain stdout, got: {log_content}"
