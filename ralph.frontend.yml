@@ -1,7 +1,7 @@
 event_loop:
   completion_promise: LOOP_COMPLETE
   max_iterations: 50
-  max_runtime_seconds: 7200
+  max_runtime_seconds: 43200
   starting_event: work.start
 
 cli:

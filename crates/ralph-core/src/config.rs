@@ -820,7 +820,7 @@ fn default_max_iterations() -> u32 {
 }
 
 fn default_max_runtime() -> u64 {
-    14400 // 4 hours
+    43200 // 12 hours
 }
 
 fn default_max_failures() -> u32 {
