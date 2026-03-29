@@ -22,10 +22,14 @@ import {
   WifiOff,
   Loader2,
   XCircle,
+  CheckCircle2,
+  Pause,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ansiToHtml, stripAnsi } from "@/lib/ansi";
 import { useTaskWebSocket, type LogEntry, type ConnectionState } from "@/hooks/useTaskWebSocket";
 
 interface EnhancedLogViewerProps {
@@ -62,6 +66,30 @@ const CONNECTION_CONFIG: Record<
   error: { icon: XCircle, color: "text-red-500", label: "Error" },
 };
 
+/**
+ * Terminal task status banner configuration
+ */
+const TERMINAL_STATUS_CONFIG: Record<
+  string,
+  { icon: typeof CheckCircle2; bg: string; text: string; label: string }
+> = {
+  closed: { icon: CheckCircle2, bg: "bg-green-950/50 border-green-900/50", text: "text-green-400", label: "Task Completed" },
+  failed: { icon: XCircle, bg: "bg-red-950/50 border-red-900/50", text: "text-red-400", label: "Task Failed" },
+};
+
+function CompletionBanner({ config }: { config: (typeof TERMINAL_STATUS_CONFIG)[string] }) {
+  const Icon = config.icon;
+  return (
+    <div
+      data-testid="completion-banner"
+      className={cn("flex items-center gap-2 px-3 py-2 text-xs border-t", config.bg, config.text)}
+    >
+      <Icon className="h-4 w-4" />
+      <span className="font-medium">{config.label}</span>
+    </div>
+  );
+}
+
 export function EnhancedLogViewer({ taskId, height = "400px", className }: EnhancedLogViewerProps) {
   // Filter state
   const [showStdout, setShowStdout] = useState(true);
@@ -78,10 +106,11 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
+  const explicitPauseRef = useRef(false);
 
   // WebSocket connection - logs are persisted in Zustand store
   // so they survive component unmount when task card is collapsed
-  const { entries, connectionState, error, clearEntries } = useTaskWebSocket(taskId);
+  const { entries, connectionState, error, clearEntries, taskStatus } = useTaskWebSocket(taskId);
 
   // Filter entries and count sources in a single pass
   const { filteredEntries, stdoutCount, stderrCount } = useMemo(() => {
@@ -130,25 +159,26 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
       setAutoScroll(false);
     }
 
-    // If user scrolled to bottom, resume auto-scroll
-    if (atBottom && !autoScroll) {
+    // If user scrolled to bottom, resume auto-scroll (unless explicitly paused)
+    if (atBottom && !autoScroll && !explicitPauseRef.current) {
       setAutoScroll(true);
     }
   }, [autoScroll]);
 
   // Resume auto-scroll
   const handleResumeScroll = useCallback(() => {
+    explicitPauseRef.current = false;
     setAutoScroll(true);
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, []);
 
-  // Copy single line to clipboard
+  // Copy single line to clipboard (strip ANSI codes)
   const handleCopyLine = useCallback(async (entry: LogEntry, index: number, e: MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(entry.line);
+      await navigator.clipboard.writeText(stripAnsi(entry.line));
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch {
@@ -156,10 +186,10 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
     }
   }, []);
 
-  // Copy all logs to clipboard
+  // Copy all logs to clipboard (strip ANSI codes)
   const handleCopyAll = useCallback(async () => {
     const text = filteredEntries
-      .map((e) => `[${formatTimestamp(e.timestamp)}] ${e.line}`)
+      .map((e) => `[${formatTimestamp(e.timestamp)}] ${stripAnsi(e.line)}`)
       .join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -174,6 +204,7 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
   const connectionConfig = CONNECTION_CONFIG[connectionState];
   const ConnectionIcon = connectionConfig.icon;
   const isConnecting = connectionState === "connecting";
+  const terminalConfig = TERMINAL_STATUS_CONFIG[taskStatus];
 
   return (
     <div
@@ -230,30 +261,46 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Auto-scroll indicator/button */}
-          {!autoScroll && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 px-2 text-xs text-yellow-500 border-yellow-500/30"
-              onClick={handleResumeScroll}
-            >
-              <ArrowDownToLine className="h-3 w-3 mr-1" />
-              Resume scroll
-            </Button>
-          )}
-          {autoScroll && (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <ArrowDownToLine className="h-3 w-3" />
-              Auto-scroll
-            </span>
-          )}
+          {/* Auto-scroll toggle */}
+          <Button
+            data-testid="auto-scroll-toggle"
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-6 px-2 text-xs",
+              autoScroll
+                ? "text-muted-foreground"
+                : "text-yellow-500 border-yellow-500/30"
+            )}
+            onClick={() => {
+              if (autoScroll) {
+                explicitPauseRef.current = true;
+                setAutoScroll(false);
+              } else {
+                explicitPauseRef.current = false;
+                handleResumeScroll();
+              }
+            }}
+          >
+            {autoScroll ? (
+              <>
+                <Pause className="h-3 w-3 mr-1" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="h-3 w-3 mr-1" />
+                Resume
+              </>
+            )}
+          </Button>
 
           {/* Line count */}
           <span className="text-muted-foreground tabular-nums">{filteredEntries.length} lines</span>
 
           {/* Copy all button */}
           <Button
+            data-testid="copy-all-button"
             variant="ghost"
             size="sm"
             className="h-6 px-2"
@@ -294,13 +341,17 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
         className="flex-1 overflow-auto font-mono text-xs"
       >
         {filteredEntries.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            {connectionState === "connected"
-              ? "Waiting for logs..."
-              : connectionState === "connecting"
-                ? "Connecting..."
-                : "Disconnected"}
-          </div>
+          terminalConfig ? (
+            <CompletionBanner config={terminalConfig} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              {connectionState === "connected"
+                ? "Waiting for logs..."
+                : connectionState === "connecting"
+                  ? "Connecting..."
+                  : "Disconnected"}
+            </div>
+          )
         ) : (
           <div className="min-w-0">
             {filteredEntries.map((entry, index) => {
@@ -330,15 +381,15 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
                     {formatTimestamp(entry.timestamp)}
                   </span>
 
-                  {/* Log content */}
+                  {/* Log content — ANSI codes rendered as colored spans */}
                   <span
+                    data-testid={`log-content-${index}`}
                     className={cn(
                       "flex-1 whitespace-pre-wrap break-all",
                       isStderr ? "text-red-300" : "text-zinc-100"
                     )}
-                  >
-                    {entry.line}
-                  </span>
+                    dangerouslySetInnerHTML={{ __html: ansiToHtml(entry.line) }}
+                  />
 
                   {/* Copy button (shown on hover) */}
                   <button
@@ -358,6 +409,11 @@ export function EnhancedLogViewer({ taskId, height = "400px", className }: Enhan
           </div>
         )}
       </div>
+
+      {/* Completion status banner — shown when task reaches terminal state with log entries */}
+      {terminalConfig && filteredEntries.length > 0 && (
+        <CompletionBanner config={terminalConfig} />
+      )}
 
       {/* Scroll to bottom indicator (when not at bottom and auto-scroll is off) */}
       {!isAtBottom && !autoScroll && filteredEntries.length > 0 && (

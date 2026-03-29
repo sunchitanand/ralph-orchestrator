@@ -71,6 +71,8 @@ interface UseTaskWebSocketReturn {
   latestEvent: RalphEvent | null;
   connectionState: ConnectionState;
   taskStatus: string;
+  currentIteration: number | null;
+  currentHat: string | null;
   error: string | null;
   connect: () => void;
   disconnect: () => void;
@@ -158,6 +160,8 @@ export function useTaskWebSocket(
   const [taskStatus, setTaskStatus] = useState<string>("unknown");
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<RalphEvent[]>([]);
+  const [currentIteration, setCurrentIteration] = useState<number | null>(null);
+  const [currentHat, setCurrentHat] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef<number>(0);
@@ -375,6 +379,13 @@ export function useTaskWebSocket(
             if (event.resource?.id !== taskId) {
               return;
             }
+            const payload = asRecord(event.payload);
+            if (typeof payload?.iteration === "number") {
+              setCurrentIteration(payload.iteration);
+            }
+            if (typeof payload?.hat === "string") {
+              setCurrentHat(payload.hat);
+            }
             const logEntry = toLogEntry(event);
             logBufferRef.current.push(logEntry);
             scheduleFlush();
@@ -458,6 +469,8 @@ export function useTaskWebSocket(
       setTaskStatus("unknown");
       setError(null);
       setEvents([]);
+      setCurrentIteration(null);
+      setCurrentHat(null);
       connect();
     } else if (!taskId) {
       disconnect();
@@ -484,6 +497,8 @@ export function useTaskWebSocket(
     latestEvent,
     connectionState,
     taskStatus,
+    currentIteration,
+    currentHat,
     error,
     connect,
     disconnect,

@@ -1,28 +1,20 @@
-/**
- * App Component
- *
- * Application routing configuration using React Router.
- * Defines routes with AppShell layout and page components.
- */
-
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/layout";
-import { TasksPage, PlanPage, BuilderPage, TaskDetailPage, SettingsPage, PresetsPage } from "./pages";
+import { TasksPage, PlanPage, BuilderPage, TaskDetailPage, SettingsPage, PresetsPage, LoopsPage } from "./pages";
 
 export function App() {
   return (
     <Routes>
-      {/* AppShell provides the layout, Outlet renders the matched route */}
       <Route element={<AppShell />}>
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
         <Route path="/builder" element={<BuilderPage />} />
         <Route path="/presets" element={<PresetsPage />} />
+        <Route path="/loops" element={<LoopsPage />} />
+        <Route path="/loops/:id" element={<Navigate to="/loops" replace />} />
         <Route path="/plan" element={<PlanPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        {/* Redirect root to tasks */}
         <Route path="/" element={<Navigate to="/tasks" replace />} />
-        {/* Catch-all redirect to tasks */}
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Route>
     </Routes>

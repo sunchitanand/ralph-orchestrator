@@ -76,6 +76,28 @@ pub struct TriggerMergeTaskResult {
     pub queued_task_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoopDiffParams {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffFile {
+    pub path: String,
+    pub status: String,
+    pub additions: u64,
+    pub deletions: u64,
+    pub diff: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoopDiffResult {
+    pub files: Vec<DiffFile>,
+}
+
 pub struct LoopDomain {
     workspace_root: PathBuf,
     process_interval_ms: u64,
@@ -454,5 +476,131 @@ impl LoopDomain {
             task_id: task.id,
             queued_task_id: task.queued_task_id,
         })
+    }
+
+    pub fn diff(&self, params: LoopDiffParams) -> Result<LoopDiffResult, ApiError> {
+        let loop_root = resolve_loop_root(&self.workspace_root, &params.id)?;
+
+        // Find merge-base against main/master
+        let merge_base = Command::new("git")
+            .args(["merge-base", "HEAD", "main"])
+            .current_dir(&loop_root)
+            .output()
+            .map_err(|e| ApiError::internal(format!("git merge-base failed: {e}")))?;
+
+        let base_ref = if merge_base.status.success() {
+            String::from_utf8_lossy(&merge_base.stdout).trim().to_string()
+        } else {
+            // Fallback: try "master", then use HEAD (empty diff)
+            let master = Command::new("git")
+                .args(["merge-base", "HEAD", "master"])
+                .current_dir(&loop_root)
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+            match master {
+                Some(b) => b,
+                None => return Ok(LoopDiffResult { files: vec![] }),
+            }
+        };
+
+        // Get name-status for actual A/M/D/R classification
+        let name_status_out = Command::new("git")
+            .args(["diff", "--name-status", &base_ref])
+            .current_dir(&loop_root)
+            .output()
+            .map_err(|e| ApiError::internal(format!("git diff --name-status failed: {e}")))?;
+
+        let name_status_text = String::from_utf8_lossy(&name_status_out.stdout);
+        let mut status_map: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        for line in name_status_text.lines() {
+            let parts: Vec<&str> = line.splitn(2, '\t').collect();
+            if parts.len() == 2 {
+                let status = match parts[0].chars().next().unwrap_or('M') {
+                    'A' => "added",
+                    'D' => "deleted",
+                    'R' => "renamed",
+                    _ => "modified",
+                };
+                // For renames, the path field is "old\tnew" — use the new path
+                let path = parts[1].split('\t').next_back().unwrap_or(parts[1]);
+                status_map.insert(path.to_string(), status.to_string());
+            }
+        }
+
+        // Get numstat for additions/deletions
+        let numstat = Command::new("git")
+            .args(["diff", "--numstat", &base_ref])
+            .current_dir(&loop_root)
+            .output()
+            .map_err(|e| ApiError::internal(format!("git diff --numstat failed: {e}")))?;
+
+        let numstat_text = String::from_utf8_lossy(&numstat.stdout);
+        if numstat_text.trim().is_empty() {
+            return Ok(LoopDiffResult { files: vec![] });
+        }
+
+        // Parse numstat: "additions\tdeletions\tpath"
+        let mut files: Vec<DiffFile> = Vec::new();
+        for line in numstat_text.lines() {
+            let parts: Vec<&str> = line.splitn(3, '\t').collect();
+            if parts.len() == 3 {
+                let additions = parts[0].parse::<u64>().unwrap_or(0);
+                let deletions = parts[1].parse::<u64>().unwrap_or(0);
+                let path = parts[2].to_string();
+                let status = status_map
+                    .get(&path)
+                    .cloned()
+                    .unwrap_or_else(|| "modified".to_string());
+
+                files.push(DiffFile {
+                    path,
+                    status,
+                    additions,
+                    deletions,
+                    diff: String::new(),
+                });
+            }
+        }
+
+        // Get full diff and split per file
+        let full_diff = Command::new("git")
+            .args(["diff", &base_ref])
+            .current_dir(&loop_root)
+            .output()
+            .map_err(|e| ApiError::internal(format!("git diff failed: {e}")))?;
+
+        let diff_text = String::from_utf8_lossy(&full_diff.stdout);
+        let mut current_path: Option<&str> = None;
+        let mut current_diff = String::new();
+        let mut file_diffs: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+
+        for line in diff_text.lines() {
+            if line.starts_with("diff --git") {
+                // Flush previous
+                if let Some(p) = current_path {
+                    file_diffs.insert(p.to_string(), current_diff.clone());
+                }
+                current_diff.clear();
+                // Extract path: "diff --git a/path b/path"
+                current_path = line.split(" b/").nth(1);
+            }
+            current_diff.push_str(line);
+            current_diff.push('\n');
+        }
+        if let Some(p) = current_path {
+            file_diffs.insert(p.to_string(), current_diff);
+        }
+
+        for file in &mut files {
+            if let Some(d) = file_diffs.remove(&file.path) {
+                file.diff = d;
+            }
+        }
+
+        Ok(LoopDiffResult { files })
     }
 }

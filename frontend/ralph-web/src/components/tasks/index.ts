@@ -16,3 +16,6 @@ export { TaskDetailHeader, type TaskDetailHeaderProps, type TaskAction } from ".
 export { TaskStatusBar, type TaskStatusBarProps } from "./TaskStatusBar";
 export { TaskMetadataGrid, type TaskMetadataGridProps } from "./TaskMetadataGrid";
 export { WorktreeBadge } from "./WorktreeBadge";
+export { IterationStatusBar, type IterationStatusBarProps } from "./IterationStatusBar";
+export { EventTimeline, type EventTimelineProps } from "./EventTimeline";
+export { DiffViewer, type DiffViewerProps, type DiffFile } from "./DiffViewer";

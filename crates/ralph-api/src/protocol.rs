@@ -39,6 +39,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "loop.merge",
     "loop.merge_button_state",
     "loop.trigger_merge_task",
+    "loop.diff",
     "planning.list",
     "planning.get",
     "planning.start",

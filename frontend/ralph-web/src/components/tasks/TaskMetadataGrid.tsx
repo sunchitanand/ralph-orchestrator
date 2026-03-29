@@ -21,6 +21,8 @@ export interface TaskMetadataGridProps {
     tokensOut?: number;
     estimatedCost?: number;
   };
+  /** Optional worktree path when task runs in a worktree */
+  worktreePath?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -98,6 +100,7 @@ function MetadataItem({
 export function TaskMetadataGrid({
   task,
   metrics,
+  worktreePath,
   className,
 }: TaskMetadataGridProps) {
   // Calculate duration if not provided but timestamps are available
@@ -150,6 +153,14 @@ export function TaskMetadataGrid({
           value={formatCost(metrics?.estimatedCost)}
           testId="metadata-cost"
         />
+
+        {worktreePath && (
+          <MetadataItem
+            label="Worktree"
+            value={worktreePath}
+            testId="metadata-worktree-path"
+          />
+        )}
       </dl>
 
       {/* Error display below grid */}

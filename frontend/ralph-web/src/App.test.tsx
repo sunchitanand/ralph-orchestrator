@@ -19,6 +19,7 @@ vi.mock("./pages", () => ({
   TaskDetailPage: () => <div data-testid="task-detail-page">Task Detail Page</div>,
   SettingsPage: () => <div data-testid="settings-page">Settings Page</div>,
   PresetsPage: () => <div data-testid="presets-page">Presets Page</div>,
+  LoopsPage: () => <div data-testid="loops-page">Loops Page</div>,
 }));
 
 // Mock the layout component - must render Outlet for routes to work
@@ -100,6 +101,24 @@ describe("App routing", () => {
       });
     });
   });
+
+  describe("LoopsPage route", () => {
+    it("renders LoopsPage for /loops route", async () => {
+      renderWithRoute("/loops");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("loops-page")).toBeInTheDocument();
+      });
+    });
+
+    it("redirects /loops/:id to /loops", async () => {
+      renderWithRoute("/loops/fair-fox-123");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("loops-page")).toBeInTheDocument();
+      });
+    });
+  });
 });
 
 describe("pages barrel export", () => {
@@ -113,5 +132,11 @@ describe("pages barrel export", () => {
     const pagesModule = await vi.importActual<typeof import("./pages")>("./pages");
     expect(pagesModule.PresetsPage).toBeDefined();
     expect(typeof pagesModule.PresetsPage).toBe("function");
+  });
+
+  it("exports LoopsPage from pages/index.ts", async () => {
+    const pagesModule = await vi.importActual<typeof import("./pages")>("./pages");
+    expect(pagesModule.LoopsPage).toBeDefined();
+    expect(typeof pagesModule.LoopsPage).toBe("function");
   });
 });

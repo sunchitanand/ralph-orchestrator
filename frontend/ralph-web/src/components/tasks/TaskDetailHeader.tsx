@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, Loader2, Trash2, Circle, Check, XCircle, CheckCircle2 } from "lucide-react";
 
 export type TaskStatus = "open" | "running" | "completed" | "closed" | "failed";
-export type TaskAction = "run" | "cancel" | "retry";
+export type TaskAction = "run" | "stop" | "forceStop" | "retry";
 
 export interface TaskDetailHeaderProps {
   /** Current task status */
@@ -34,19 +34,22 @@ export interface TaskDetailHeaderProps {
 /**
  * Get the action configuration for a given status
  */
-function getActionForStatus(status: TaskStatus): { action: TaskAction; label: string; variant: "default" | "destructive" } | null {
+function getActionsForStatus(status: TaskStatus): { action: TaskAction; label: string; variant: "default" | "destructive" }[] {
   switch (status) {
     case "running":
-      return { action: "cancel", label: "Cancel", variant: "destructive" };
+      return [
+        { action: "stop", label: "Stop", variant: "destructive" },
+        { action: "forceStop", label: "Force Stop", variant: "destructive" },
+      ];
     case "failed":
-      return { action: "retry", label: "Retry", variant: "default" };
+      return [{ action: "retry", label: "Retry", variant: "default" }];
     case "open":
-      return { action: "run", label: "Run", variant: "default" };
+      return [{ action: "run", label: "Run", variant: "default" }];
     case "completed":
     case "closed":
-      return null;
+      return [];
     default:
-      return null;
+      return [];
   }
 }
 
@@ -108,7 +111,7 @@ export function TaskDetailHeader({
   onDelete,
   isDeletePending = false,
 }: TaskDetailHeaderProps) {
-  const actionConfig = getActionForStatus(status);
+  const actions = getActionsForStatus(status);
   const statusConfig = STATUS_MAP[status] ?? STATUS_MAP.open;
   const StatusIcon = statusConfig.icon;
 
@@ -153,8 +156,9 @@ export function TaskDetailHeader({
           </Button>
         )}
 
-        {actionConfig && (
+        {actions.map((actionConfig) => (
           <Button
+            key={actionConfig.action}
             variant={actionConfig.variant}
             onClick={() => onAction?.(actionConfig.action)}
             disabled={!onAction || isActionPending}
@@ -162,7 +166,7 @@ export function TaskDetailHeader({
             {isActionPending && <Loader2 className="lucide-loader-2 animate-spin" />}
             {actionConfig.label}
           </Button>
-        )}
+        ))}
       </div>
     </div>
   );

@@ -262,7 +262,7 @@ export const trpc = {
       method: "task.status",
     }),
 
-    cancel: createMutationProcedure<{ id: string }, { task: any }, { success: boolean; task: any }>({
+    cancel: createMutationProcedure<{ id: string; force?: boolean }, { task: any }, { success: boolean; task: any }>({
       method: "task.cancel",
       mapResult: (result) => ({ success: true, task: result.task }),
     }),
@@ -370,6 +370,11 @@ export const trpc = {
         state: result.enabled ? "active" : "blocked",
         reason: result.reason,
       }),
+    }),
+
+    diff: createQueryProcedure<{ id: string }, { files: any[] }, { files: any[] }>({
+      scope: "loop",
+      method: "loop.diff",
     }),
   },
 

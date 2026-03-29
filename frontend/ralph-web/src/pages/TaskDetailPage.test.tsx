@@ -6,7 +6,7 @@
  * - Full prompt display (not truncated)
  * - Rich status metrics (duration, timestamps, exit code)
  * - Log viewer
- * - Action buttons (run, retry, cancel)
+ * - Action buttons (run, retry, stop, force stop)
  * - Navigation back to task list
  */
 
@@ -93,6 +93,24 @@ vi.mock("@/components/tasks/EnhancedLogViewer", () => ({
   )),
 }));
 
+// Mock EventTimeline component
+vi.mock("@/components/tasks/EventTimeline", () => ({
+  EventTimeline: vi.fn(({ events }: { events: unknown[] }) => (
+    <div data-testid="event-timeline" data-event-count={events.length}>
+      Mocked EventTimeline
+    </div>
+  )),
+}));
+
+// Mock DiffViewer component
+vi.mock("@/components/tasks/DiffViewer", () => ({
+  DiffViewer: vi.fn(({ files }: { files: unknown[] }) => (
+    <div data-testid="diff-viewer" data-file-count={files.length}>
+      Mocked DiffViewer
+    </div>
+  )),
+}));
+
 // Mock TaskCardSkeleton component to track rendering
 vi.mock("@/components/tasks/TaskCardSkeleton", () => ({
   TaskCardSkeleton: vi.fn(() => (
@@ -109,6 +127,24 @@ vi.mock("@/components/tasks/EmptyState", () => ({
       <span data-testid="empty-state-description">{description}</span>
     </div>
   )),
+}));
+
+// Mock useTaskWebSocket hook
+vi.mock("@/hooks/useTaskWebSocket", () => ({
+  useTaskWebSocket: vi.fn(() => ({
+    entries: [],
+    latestEntry: null,
+    events: [],
+    latestEvent: null,
+    connectionState: "disconnected",
+    taskStatus: "unknown",
+    currentIteration: null,
+    currentHat: null,
+    error: null,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    clearEntries: vi.fn(),
+  })),
 }));
 
 // Mock trpc
@@ -155,6 +191,27 @@ vi.mock("@/trpc", () => ({
         useMutation: vi.fn(() => ({
           mutate: vi.fn(),
           isPending: false,
+        })),
+      },
+      stop: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
+      diff: {
+        useQuery: vi.fn(() => ({
+          data: null,
+          isLoading: false,
+          isError: false,
+        })),
+      },
+    },
+    config: {
+      get: {
+        useQuery: vi.fn(() => ({
+          data: null,
+          isLoading: false,
         })),
       },
     },
@@ -471,7 +528,7 @@ describe("TaskDetailPage", () => {
       expect(screen.getByRole("button", { name: /run/i })).toBeInTheDocument();
     });
 
-    it("shows Cancel button for running tasks", async () => {
+    it("shows Stop and Force Stop buttons for running tasks", async () => {
       // Given: A running task
       const { trpc } = await import("@/trpc");
       vi.mocked(trpc.task.get.useQuery).mockReturnValue({
@@ -483,8 +540,9 @@ describe("TaskDetailPage", () => {
       // When: The page is rendered
       renderWithRouter("task-001");
 
-      // Then: Cancel button should be present
-      expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+      // Then: Stop and Force Stop buttons should be present
+      expect(screen.getByRole("button", { name: /^stop$/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /force stop/i })).toBeInTheDocument();
     });
 
     it("shows Retry button for failed tasks", async () => {
@@ -540,6 +598,76 @@ describe("TaskDetailPage", () => {
 
       // Then: The mutation should be invoked
       expect(mockMutate).toHaveBeenCalledWith({ id: "task-004" });
+    });
+
+    it("Stop button calls both task.cancel and loops.stop when loop is associated", async () => {
+      // Given: A running task with an associated loop
+      const user = userEvent.setup();
+      const mockCancelMutate = vi.fn();
+      const mockLoopStopMutate = vi.fn();
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask, // running, loopId: "loop-001"
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [{ id: "loop-001", status: "running", location: "/ws", prompt: "test" }],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+      vi.mocked(trpc.task.cancel.useMutation).mockReturnValue({
+        mutate: mockCancelMutate,
+        isPending: false,
+      } as unknown as ReturnType<typeof trpc.task.cancel.useMutation>);
+      vi.mocked(trpc.loops.stop.useMutation).mockReturnValue({
+        mutate: mockLoopStopMutate,
+        isPending: false,
+      } as unknown as ReturnType<typeof trpc.loops.stop.useMutation>);
+
+      // When: The Stop button is clicked
+      renderWithRouter("task-001");
+      await user.click(screen.getByRole("button", { name: /^stop$/i }));
+
+      // Then: Both task.cancel and loops.stop should be called
+      expect(mockCancelMutate).toHaveBeenCalledWith({ id: "task-001" });
+      expect(mockLoopStopMutate).toHaveBeenCalledWith({ id: "loop-001" });
+    });
+
+    it("Force Stop button calls both task.cancel with force and loops.stop with force when loop is associated", async () => {
+      // Given: A running task with an associated loop
+      const user = userEvent.setup();
+      const mockCancelMutate = vi.fn();
+      const mockLoopStopMutate = vi.fn();
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask, // running, loopId: "loop-001"
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [{ id: "loop-001", status: "running", location: "/ws", prompt: "test" }],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+      vi.mocked(trpc.task.cancel.useMutation).mockReturnValue({
+        mutate: mockCancelMutate,
+        isPending: false,
+      } as unknown as ReturnType<typeof trpc.task.cancel.useMutation>);
+      vi.mocked(trpc.loops.stop.useMutation).mockReturnValue({
+        mutate: mockLoopStopMutate,
+        isPending: false,
+      } as unknown as ReturnType<typeof trpc.loops.stop.useMutation>);
+
+      // When: The Force Stop button is clicked
+      renderWithRouter("task-001");
+      await user.click(screen.getByRole("button", { name: /force stop/i }));
+
+      // Then: Both task.cancel and loops.stop should be called with force
+      expect(mockCancelMutate).toHaveBeenCalledWith({ id: "task-001", force: true });
+      expect(mockLoopStopMutate).toHaveBeenCalledWith({ id: "loop-001", force: true });
     });
   });
 
@@ -904,6 +1032,327 @@ describe("TaskDetailPage", () => {
 
       // Then: Loop badge should NOT be shown (stale association guard)
       expect(screen.queryByText("Loop:")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("worktree status display", () => {
+    it("shows WorktreeBadge when associated loop is in a worktree", async () => {
+      // Given: A running task with a worktree loop (location is NOT "(in-place)")
+      // Note: isPrimary is NOT in the API response — detection uses location string
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask, // loopId: "loop-001"
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [
+          {
+            id: "loop-001",
+            status: "running",
+            location: "/repo/.worktrees/fair-fox",
+            prompt: "Test prompt",
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      // When: The page is rendered
+      renderWithRouter("task-001");
+
+      // Then: WorktreeBadge should be shown with "worktree:" prefix
+      expect(screen.getByText("worktree:")).toBeInTheDocument();
+    });
+
+    it("does not show WorktreeBadge when associated loop is primary (in-place)", async () => {
+      // Given: A running task with a primary loop (location is "(in-place)")
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [
+          {
+            id: "loop-001",
+            status: "running",
+            location: "(in-place)",
+            prompt: "Test prompt",
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      // When: The page is rendered
+      renderWithRouter("task-001");
+
+      // Then: WorktreeBadge should NOT be shown
+      expect(screen.queryByText("worktree:")).not.toBeInTheDocument();
+    });
+
+    it("shows worktree path in metadata grid when loop is in a worktree", async () => {
+      // Given: A running task with a worktree loop
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [
+          {
+            id: "loop-001",
+            status: "running",
+            location: "/repo/.worktrees/fair-fox",
+            prompt: "Test prompt",
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      // When: The page is rendered
+      renderWithRouter("task-001");
+
+      // Then: Worktree path should be shown in metadata
+      expect(screen.getByTestId("metadata-worktree-path")).toBeInTheDocument();
+      expect(screen.getByTestId("metadata-worktree-path")).toHaveTextContent("/repo/.worktrees/fair-fox");
+    });
+
+    it("does not show worktree path in metadata grid when loop is primary (in-place)", async () => {
+      // Given: A running task with a primary loop
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [
+          {
+            id: "loop-001",
+            status: "running",
+            location: "(in-place)",
+            prompt: "Test prompt",
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      // When: The page is rendered
+      renderWithRouter("task-001");
+
+      // Then: Worktree path should NOT be shown
+      expect(screen.queryByTestId("metadata-worktree-path")).not.toBeInTheDocument();
+    });
+
+    it("does not show worktree info when no associated loop exists", async () => {
+      // Given: An open task with no loop
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockOpenTask, // loopId: null
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      // When: The page is rendered
+      renderWithRouter("task-004");
+
+      // Then: Neither WorktreeBadge nor worktree path should be shown
+      expect(screen.queryByText("worktree:")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("metadata-worktree-path")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("event timeline", () => {
+    const mockEvents = [
+      { ts: "2024-01-15T10:10:00Z", topic: "hat.activated", hat: "Builder", iteration: 1, payload: null },
+      { ts: "2024-01-15T10:11:00Z", topic: "build.done", hat: "Builder", iteration: 1, payload: { status: "passed" } },
+    ];
+
+    it("renders EventTimeline when running task has events", async () => {
+      const { trpc } = await import("@/trpc");
+      const { useTaskWebSocket } = await import("@/hooks/useTaskWebSocket");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(useTaskWebSocket).mockReturnValue({
+        entries: [], latestEntry: null, events: mockEvents, latestEvent: null,
+        connectionState: "connected", taskStatus: "running",
+        currentIteration: 1, currentHat: "Builder",
+        error: null, connect: vi.fn(), disconnect: vi.fn(), clearEntries: vi.fn(),
+      } as ReturnType<typeof useTaskWebSocket>);
+
+      renderWithRouter("task-001");
+
+      expect(screen.getByTestId("event-timeline")).toBeInTheDocument();
+      expect(screen.getByText(/event timeline/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 events/i)).toBeInTheDocument();
+    });
+
+    it("renders EventTimeline for completed tasks with accumulated events", async () => {
+      const { trpc } = await import("@/trpc");
+      const { useTaskWebSocket } = await import("@/hooks/useTaskWebSocket");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockClosedTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(useTaskWebSocket).mockReturnValue({
+        entries: [], latestEntry: null, events: mockEvents, latestEvent: null,
+        connectionState: "disconnected", taskStatus: "closed",
+        currentIteration: null, currentHat: null,
+        error: null, connect: vi.fn(), disconnect: vi.fn(), clearEntries: vi.fn(),
+      } as ReturnType<typeof useTaskWebSocket>);
+
+      renderWithRouter("task-005");
+
+      expect(screen.getByTestId("event-timeline")).toBeInTheDocument();
+    });
+
+    it("does not render EventTimeline when events array is empty", async () => {
+      const { trpc } = await import("@/trpc");
+      const { useTaskWebSocket } = await import("@/hooks/useTaskWebSocket");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(useTaskWebSocket).mockReturnValue({
+        entries: [], latestEntry: null, events: [], latestEvent: null,
+        connectionState: "connected", taskStatus: "running",
+        currentIteration: null, currentHat: null,
+        error: null, connect: vi.fn(), disconnect: vi.fn(), clearEntries: vi.fn(),
+      } as ReturnType<typeof useTaskWebSocket>);
+
+      renderWithRouter("task-001");
+
+      expect(screen.queryByTestId("event-timeline")).not.toBeInTheDocument();
+    });
+
+    it("collapsible section header toggles EventTimeline visibility", async () => {
+      const user = userEvent.setup();
+      const { trpc } = await import("@/trpc");
+      const { useTaskWebSocket } = await import("@/hooks/useTaskWebSocket");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(useTaskWebSocket).mockReturnValue({
+        entries: [], latestEntry: null, events: mockEvents, latestEvent: null,
+        connectionState: "connected", taskStatus: "running",
+        currentIteration: 1, currentHat: "Builder",
+        error: null, connect: vi.fn(), disconnect: vi.fn(), clearEntries: vi.fn(),
+      } as ReturnType<typeof useTaskWebSocket>);
+
+      renderWithRouter("task-001");
+
+      // Initially visible
+      expect(screen.getByTestId("event-timeline")).toBeInTheDocument();
+
+      // Click header to collapse
+      await user.click(screen.getByText(/event timeline/i));
+      expect(screen.queryByTestId("event-timeline")).not.toBeInTheDocument();
+
+      // Click again to expand
+      await user.click(screen.getByText(/event timeline/i));
+      expect(screen.getByTestId("event-timeline")).toBeInTheDocument();
+    });
+  });
+
+  describe("changes tab", () => {
+    const mockDiffFiles = [
+      { path: "src/main.rs", status: "modified", additions: 5, deletions: 2, diff: "+new\n-old" },
+    ];
+
+    it("shows Changes tab when task has an associated loop", async () => {
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: { ...mockClosedTask, loopId: "loop-001" },
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [{ id: "loop-001", status: "merged", location: "/ws", prompt: "test" }],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      renderWithRouter("task-005");
+
+      expect(screen.getByRole("tab", { name: /output/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /events/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /changes/i })).toBeInTheDocument();
+    });
+
+    it("does not show tab bar when task has no associated loop", async () => {
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: mockOpenTask,
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+
+      renderWithRouter("task-004");
+
+      expect(screen.queryByRole("tab", { name: /changes/i })).not.toBeInTheDocument();
+    });
+
+    it("clicking Changes tab renders DiffViewer", async () => {
+      const user = userEvent.setup();
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: { ...mockClosedTask, loopId: "loop-001" },
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [{ id: "loop-001", status: "merged", location: "/ws", prompt: "test" }],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+      vi.mocked(trpc.loops.diff.useQuery).mockReturnValue({
+        data: { files: mockDiffFiles },
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.diff.useQuery>);
+
+      renderWithRouter("task-005");
+
+      await user.click(screen.getByRole("tab", { name: /changes/i }));
+
+      expect(screen.getByTestId("diff-viewer")).toBeInTheDocument();
+    });
+
+    it("Output tab is selected by default", async () => {
+      const { trpc } = await import("@/trpc");
+      vi.mocked(trpc.task.get.useQuery).mockReturnValue({
+        data: { ...mockClosedTask, loopId: "loop-001" },
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.task.get.useQuery>);
+      vi.mocked(trpc.loops.list.useQuery).mockReturnValue({
+        data: [{ id: "loop-001", status: "merged", location: "/ws", prompt: "test" }],
+        isLoading: false,
+        isError: false,
+      } as ReturnType<typeof trpc.loops.list.useQuery>);
+
+      renderWithRouter("task-005");
+
+      const outputTab = screen.getByRole("tab", { name: /output/i });
+      expect(outputTab).toHaveAttribute("aria-selected", "true");
     });
   });
 });

@@ -22,6 +22,8 @@ import {
   Archive,
   GitMerge,
   Trash2,
+  Square,
+  Zap,
 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -188,6 +190,10 @@ const TaskThreadComponent = forwardRef<HTMLDivElement, TaskThreadProps>(function
   const canRun = isOpen && !task.blockedBy;
   // Can retry: only failed tasks
   const canRetry = isFailed;
+  // Can cancel: running tasks (shows Stop + Force Stop)
+  const canStop = isRunning;
+  // Can delete: terminal states (completed, failed, closed)
+  const canDelete = task.status === "completed" || isFailed || task.status === "closed";
 
   // tRPC mutations
   const utils = trpc.useUtils();
@@ -201,12 +207,27 @@ const TaskThreadComponent = forwardRef<HTMLDivElement, TaskThreadProps>(function
       utils.task.list.invalidate();
     },
   });
+  const cancelMutation = trpc.task.cancel.useMutation({
+    onSuccess: () => {
+      utils.task.list.invalidate();
+    },
+  });
+  const deleteMutation = trpc.task.delete.useMutation({
+    onSuccess: () => {
+      utils.task.list.invalidate();
+    },
+  });
   const mergeMutation = trpc.loops.merge.useMutation({
     onSuccess: () => {
       utils.loops.list.invalidate();
     },
   });
   const discardMutation = trpc.loops.discard.useMutation({
+    onSuccess: () => {
+      utils.loops.list.invalidate();
+    },
+  });
+  const loopStopMutation = trpc.loops.stop.useMutation({
     onSuccess: () => {
       utils.loops.list.invalidate();
     },
@@ -226,6 +247,42 @@ const TaskThreadComponent = forwardRef<HTMLDivElement, TaskThreadProps>(function
       retryMutation.mutate({ id: task.id });
     },
     [task.id, retryMutation]
+  );
+
+  const handleStop = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      if (window.confirm(`Stop running task "${task.title}"?`)) {
+        cancelMutation.mutate({ id: task.id });
+        if (loop) {
+          loopStopMutation.mutate({ id: loop.id });
+        }
+      }
+    },
+    [task.id, task.title, cancelMutation, loop, loopStopMutation]
+  );
+
+  const handleForceStop = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      if (window.confirm(`Force stop task "${task.title}"? This will immediately kill the process.`)) {
+        cancelMutation.mutate({ id: task.id, force: true });
+        if (loop) {
+          loopStopMutation.mutate({ id: loop.id, force: true });
+        }
+      }
+    },
+    [task.id, task.title, cancelMutation, loop, loopStopMutation]
+  );
+
+  const handleDelete = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      if (window.confirm(`Delete task "${task.title}"? This cannot be undone.`)) {
+        deleteMutation.mutate({ id: task.id });
+      }
+    },
+    [task.id, task.title, deleteMutation]
   );
 
   const handleMerge = useCallback(
@@ -257,7 +314,7 @@ const TaskThreadComponent = forwardRef<HTMLDivElement, TaskThreadProps>(function
     [task.updatedAt]
   );
 
-  const isExecuting = runMutation.isPending || retryMutation.isPending || mergeMutation.isPending || discardMutation.isPending;
+  const isExecuting = runMutation.isPending || retryMutation.isPending || cancelMutation.isPending || deleteMutation.isPending || mergeMutation.isPending || discardMutation.isPending || loopStopMutation.isPending;
 
   // Determine if merge/discard buttons should be shown
   // Per spec: Show for worktree loops in "queued" or "needs-review" status
@@ -401,6 +458,42 @@ const TaskThreadComponent = forwardRef<HTMLDivElement, TaskThreadProps>(function
               </Button>
             )}
 
+            {/* Stop button for running tasks (graceful SIGTERM) */}
+            {canStop && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 h-6 px-2 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                onClick={handleStop}
+                disabled={isExecuting}
+              >
+                {cancelMutation.isPending && !loopStopMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Square className="h-3 w-3" />
+                )}
+                <span className="ml-1">Stop</span>
+              </Button>
+            )}
+
+            {/* Force Stop button for running tasks (SIGKILL) */}
+            {canStop && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 h-6 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                onClick={handleForceStop}
+                disabled={isExecuting}
+              >
+                {loopStopMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Zap className="h-3 w-3" />
+                )}
+                <span className="ml-1">Force Stop</span>
+              </Button>
+            )}
+
             {/* Retry button */}
             {canRetry && (
               <Button
@@ -416,6 +509,24 @@ const TaskThreadComponent = forwardRef<HTMLDivElement, TaskThreadProps>(function
                   <RotateCcw className="h-3 w-3" />
                 )}
                 <span className="ml-1">Retry</span>
+              </Button>
+            )}
+
+            {/* Delete button for terminal states */}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 h-6 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                onClick={handleDelete}
+                disabled={isExecuting}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
+                )}
+                <span className="ml-1">Delete</span>
               </Button>
             )}
           </div>

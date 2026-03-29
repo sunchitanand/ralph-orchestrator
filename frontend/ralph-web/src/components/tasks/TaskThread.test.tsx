@@ -6,7 +6,7 @@
  * pattern used by GitHub Issues, Linear, Jira, etc.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -21,12 +21,23 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-// Mock tRPC hooks
+// Mock tRPC hooks — trackable mutate fns for action button tests
+const mockMutate = {
+  run: vi.fn(),
+  retry: vi.fn(),
+  cancel: vi.fn(),
+  delete: vi.fn(),
+  loopMerge: vi.fn(),
+  loopDiscard: vi.fn(),
+  loopStop: vi.fn(),
+  loopRetry: vi.fn(),
+};
+
 vi.mock("@/trpc", () => {
   const noop = () => {};
-  const createMockMutation = () => ({
-    mutate: noop,
-    mutateAsync: noop,
+  const createMockMutation = (mutateFn: (...args: any[]) => void = noop) => ({
+    mutate: mutateFn,
+    mutateAsync: mutateFn,
     isPending: false,
     isError: false,
     error: null,
@@ -35,15 +46,16 @@ vi.mock("@/trpc", () => {
   return {
     trpc: {
       task: {
-        run: { useMutation: () => createMockMutation() },
-        retry: { useMutation: () => createMockMutation() },
-        cancel: { useMutation: () => createMockMutation() },
+        run: { useMutation: () => createMockMutation(mockMutate.run) },
+        retry: { useMutation: () => createMockMutation(mockMutate.retry) },
+        cancel: { useMutation: () => createMockMutation(mockMutate.cancel) },
+        delete: { useMutation: () => createMockMutation(mockMutate.delete) },
       },
       loops: {
-        retry: { useMutation: () => createMockMutation() },
-        merge: { useMutation: () => createMockMutation() },
-        discard: { useMutation: () => createMockMutation() },
-        stop: { useMutation: () => createMockMutation() },
+        retry: { useMutation: () => createMockMutation(mockMutate.loopRetry) },
+        merge: { useMutation: () => createMockMutation(mockMutate.loopMerge) },
+        discard: { useMutation: () => createMockMutation(mockMutate.loopDiscard) },
+        stop: { useMutation: () => createMockMutation(mockMutate.loopStop) },
       },
       useUtils: () => ({
         task: { list: { invalidate: noop } },
@@ -252,6 +264,322 @@ describe("TaskThread navigation behavior", () => {
       // Then: The card should NOT have the green left border class
       const taskCard = getTaskCard();
       expect(taskCard).not.toHaveClass("border-l-4");
+    });
+  });
+
+  describe("inline action buttons by status", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** Find an inline action button by its label text (avoids matching the Card role="button") */
+    function getActionButton(label: string): HTMLButtonElement {
+      const btn = screen.getByText(label).closest("button");
+      if (!btn) throw new Error(`Could not find <button> for "${label}"`);
+      return btn as HTMLButtonElement;
+    }
+
+    it("shows Stop and Force Stop buttons for running tasks", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Stop")).toBeInTheDocument();
+      expect(getActionButton("Force Stop")).toBeInTheDocument();
+    });
+
+    it("Stop button calls task.cancel with confirmation", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Stop"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.cancel).toHaveBeenCalledWith({ id: mockTask.id });
+    });
+
+    it("Stop button also calls loop.stop when loop is associated", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      const loop = { id: "loop-abc", status: "running", location: "(in-place)" } as any;
+      render(<TaskThread task={runningTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Stop"));
+
+      expect(mockMutate.cancel).toHaveBeenCalledWith({ id: mockTask.id });
+      expect(mockMutate.loopStop).toHaveBeenCalledWith({ id: "loop-abc" });
+    });
+
+    it("Force Stop button calls task.cancel with force and loop.stop with force", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      const loop = { id: "loop-abc", status: "running", location: "(in-place)" } as any;
+      render(<TaskThread task={runningTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Force Stop"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.cancel).toHaveBeenCalledWith({ id: mockTask.id, force: true });
+      expect(mockMutate.loopStop).toHaveBeenCalledWith({ id: "loop-abc", force: true });
+    });
+
+    it("Stop button does not call mutations when confirmation is declined", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Stop"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.cancel).not.toHaveBeenCalled();
+    });
+
+    it("Force Stop button does not call mutations when confirmation is declined", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Force Stop"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.cancel).not.toHaveBeenCalled();
+    });
+
+    it("shows Delete button for failed tasks", () => {
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Delete")).toBeInTheDocument();
+    });
+
+    it("shows Delete button for completed tasks", () => {
+      const completedTask: Task = { ...mockTask, status: "completed" };
+      render(<TaskThread task={completedTask} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Delete")).toBeInTheDocument();
+    });
+
+    it("shows Delete button for closed tasks", () => {
+      const closedTask: Task = { ...mockTask, status: "closed" };
+      render(<TaskThread task={closedTask} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Delete")).toBeInTheDocument();
+    });
+
+    it("Delete button calls task.delete with confirmation", () => {
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Delete"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.delete).toHaveBeenCalledWith({ id: mockTask.id });
+    });
+
+    it("Delete button does not call task.delete when confirmation is declined", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Delete"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.delete).not.toHaveBeenCalled();
+    });
+
+    it("does not show Stop or Delete for open tasks (only Run)", () => {
+      render(<TaskThread task={mockTask} />, { wrapper: createTestWrapper() });
+
+      expect(screen.queryByText("Stop")).not.toBeInTheDocument();
+      expect(screen.queryByText("Force Stop")).not.toBeInTheDocument();
+      expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+      expect(screen.getByText("Run")).toBeInTheDocument();
+    });
+
+    it("Stop button does not trigger navigation", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Stop"));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it("Force Stop button does not trigger navigation", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Force Stop"));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it("Delete button does not trigger navigation", () => {
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Delete"));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    // --- Retry button tests ---
+
+    it("shows Retry button for failed tasks", () => {
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Retry")).toBeInTheDocument();
+    });
+
+    it("Retry button calls task.retry mutation", () => {
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Retry"));
+
+      expect(mockMutate.retry).toHaveBeenCalledWith({ id: mockTask.id });
+    });
+
+    it("Retry button does not trigger navigation", () => {
+      const failedTask: Task = { ...mockTask, status: "failed" };
+      render(<TaskThread task={failedTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Retry"));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    // --- Blocked task tests ---
+
+    it("does not show Run button for open tasks with blockedBy set", () => {
+      const blockedTask: Task = { ...mockTask, status: "open", blockedBy: "task-999" };
+      render(<TaskThread task={blockedTask} />, { wrapper: createTestWrapper() });
+
+      expect(screen.queryByText("Run")).not.toBeInTheDocument();
+    });
+
+    // --- Button visibility for other statuses ---
+
+    it("does not show action buttons for pending tasks", () => {
+      const pendingTask: Task = { ...mockTask, status: "pending" };
+      render(<TaskThread task={pendingTask} />, { wrapper: createTestWrapper() });
+
+      expect(screen.queryByText("Run")).not.toBeInTheDocument();
+      expect(screen.queryByText("Stop")).not.toBeInTheDocument();
+      expect(screen.queryByText("Retry")).not.toBeInTheDocument();
+      expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+    });
+
+    it("does not show action buttons for cancelled tasks", () => {
+      const cancelledTask: Task = { ...mockTask, status: "cancelled" };
+      render(<TaskThread task={cancelledTask} />, { wrapper: createTestWrapper() });
+
+      expect(screen.queryByText("Run")).not.toBeInTheDocument();
+      expect(screen.queryByText("Stop")).not.toBeInTheDocument();
+      expect(screen.queryByText("Retry")).not.toBeInTheDocument();
+      // cancelled is not in canDelete (completed|failed|closed)
+      expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+    });
+
+    // --- Stop/Force Stop without loop ---
+
+    it("Stop without loop does not call loops.stop", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Stop"));
+
+      expect(mockMutate.cancel).toHaveBeenCalledWith({ id: mockTask.id });
+      expect(mockMutate.loopStop).not.toHaveBeenCalled();
+    });
+
+    it("Force Stop without loop does not call loops.stop", () => {
+      const runningTask: Task = { ...mockTask, status: "running" };
+      render(<TaskThread task={runningTask} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Force Stop"));
+
+      expect(mockMutate.cancel).toHaveBeenCalledWith({ id: mockTask.id, force: true });
+      expect(mockMutate.loopStop).not.toHaveBeenCalled();
+    });
+
+    // --- Merge/Discard worktree button tests ---
+
+    it("shows Merge and Discard buttons for worktree loop in needs-review status", () => {
+      const loop = { id: "loop-wt", status: "needs-review" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Merge")).toBeInTheDocument();
+      expect(getActionButton("Discard")).toBeInTheDocument();
+    });
+
+    it("shows Merge and Discard buttons for worktree loop in queued status", () => {
+      const loop = { id: "loop-wt", status: "queued" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      expect(getActionButton("Merge")).toBeInTheDocument();
+      expect(getActionButton("Discard")).toBeInTheDocument();
+    });
+
+    it("does not show Merge/Discard for in-place loops", () => {
+      const loop = { id: "loop-ip", status: "needs-review" as const, location: "(in-place)", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      expect(screen.queryByText("Merge")).not.toBeInTheDocument();
+      expect(screen.queryByText("Discard")).not.toBeInTheDocument();
+    });
+
+    it("does not show Merge/Discard for running worktree loops", () => {
+      const loop = { id: "loop-wt", status: "running" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      expect(screen.queryByText("Merge")).not.toBeInTheDocument();
+      expect(screen.queryByText("Discard")).not.toBeInTheDocument();
+    });
+
+    it("Merge button calls loops.merge with confirmation", () => {
+      const loop = { id: "loop-wt", status: "needs-review" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Merge"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.loopMerge).toHaveBeenCalledWith({ id: "loop-wt" });
+    });
+
+    it("Merge button does not call mutation when confirmation is declined", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      const loop = { id: "loop-wt", status: "needs-review" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Merge"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.loopMerge).not.toHaveBeenCalled();
+    });
+
+    it("Discard button calls loops.discard with confirmation", () => {
+      const loop = { id: "loop-wt", status: "needs-review" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Discard"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.loopDiscard).toHaveBeenCalledWith({ id: "loop-wt" });
+    });
+
+    it("Discard button does not call mutation when confirmation is declined", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      const loop = { id: "loop-wt", status: "needs-review" as const, location: ".worktrees/test", prompt: "p" };
+      render(<TaskThread task={mockTask} loop={loop} />, { wrapper: createTestWrapper() });
+
+      fireEvent.click(getActionButton("Discard"));
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(mockMutate.loopDiscard).not.toHaveBeenCalled();
     });
   });
 });

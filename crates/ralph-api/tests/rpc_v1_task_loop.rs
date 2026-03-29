@@ -351,7 +351,7 @@ async fn task_update_clears_terminal_and_queue_fields_on_non_terminal_transition
     assert_eq!(cancel_payload["result"]["task"]["status"], "failed");
     assert_eq!(
         cancel_payload["result"]["task"]["errorMessage"],
-        "Task cancelled by user"
+        "Task stopped by user"
     );
 
     let reopen = rpc_request(

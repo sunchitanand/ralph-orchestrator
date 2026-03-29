@@ -1,14 +1,15 @@
 use serde_json::{Value, json};
 use tracing::warn;
 
-use super::{IdOnlyParams, RpcRuntime};
+use super::{IdOnlyParams, RpcRuntime, TaskCancelParams};
 use crate::collection_domain::{
     CollectionCreateParams, CollectionImportParams, CollectionUpdateParams,
 };
 use crate::config_domain::ConfigUpdateParams;
 use crate::errors::ApiError;
 use crate::loop_domain::{
-    LoopListParams, LoopRetryParams, LoopStopMergeParams, LoopTriggerMergeTaskParams,
+    LoopDiffParams, LoopListParams, LoopRetryParams, LoopStopMergeParams,
+    LoopTriggerMergeTaskParams,
 };
 use crate::planning_domain::{
     PlanningGetArtifactParams, PlanningRespondParams, PlanningStartParams,
@@ -125,8 +126,9 @@ impl RpcRuntime {
                 Ok(json!(result))
             }
             "task.cancel" => {
-                let params: IdOnlyParams = self.parse_params(request)?;
-                let task = self.task_domain_mut()?.cancel(&params.id)?;
+                let params: TaskCancelParams = self.parse_params(request)?;
+                let force = params.force.unwrap_or(false);
+                let task = self.task_domain_mut()?.cancel(&params.id, force)?;
                 Ok(json!({ "task": task }))
             }
             "task.status" => {
@@ -190,6 +192,11 @@ impl RpcRuntime {
                 let loops = self.loop_domain_mut()?;
                 let mut tasks = self.task_domain_mut()?;
                 let result = loops.trigger_merge_task(params, &mut tasks)?;
+                Ok(json!(result))
+            }
+            "loop.diff" => {
+                let params: IdOnlyParams = self.parse_params(request)?;
+                let result = self.loop_domain_mut()?.diff(LoopDiffParams { id: params.id })?;
                 Ok(json!(result))
             }
             _ => Err(ApiError::service_unavailable(format!(

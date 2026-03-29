@@ -3,7 +3,7 @@
  *
  * Tests for the TaskDetailHeader component that displays:
  * - Left side: Back navigation button ("← Back to Tasks")
- * - Right side: Delete button (for failed/closed) + Status-based action button (Cancel/Retry/Run)
+ * - Right side: Delete button (for failed/closed) + Status-based action buttons (Stop/Force Stop/Retry/Run)
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -54,25 +54,39 @@ describe("TaskDetailHeader", () => {
 
   describe("status-based action buttons", () => {
     describe("when status is 'running'", () => {
-      it("renders Cancel button with destructive variant", () => {
+      it("renders Stop and Force Stop buttons with destructive variant", () => {
         render(<TaskDetailHeader {...defaultProps} status="running" />);
 
-        const cancelButton = screen.getByRole("button", { name: /cancel/i });
-        expect(cancelButton).toBeInTheDocument();
-        // Destructive variant typically has red styling
-        expect(cancelButton).toHaveClass("bg-destructive");
+        const stopButton = screen.getByRole("button", { name: /^stop$/i });
+        const forceStopButton = screen.getByRole("button", { name: /force stop/i });
+        expect(stopButton).toBeInTheDocument();
+        expect(forceStopButton).toBeInTheDocument();
+        expect(stopButton).toHaveClass("bg-destructive");
+        expect(forceStopButton).toHaveClass("bg-destructive");
       });
 
-      it("calls onAction with 'cancel' when Cancel is clicked", () => {
+      it("calls onAction with 'stop' when Stop is clicked", () => {
         const onAction = vi.fn();
         render(
           <TaskDetailHeader {...defaultProps} status="running" onAction={onAction} />
         );
 
-        const cancelButton = screen.getByRole("button", { name: /cancel/i });
-        fireEvent.click(cancelButton);
+        const stopButton = screen.getByRole("button", { name: /^stop$/i });
+        fireEvent.click(stopButton);
 
-        expect(onAction).toHaveBeenCalledWith("cancel");
+        expect(onAction).toHaveBeenCalledWith("stop");
+      });
+
+      it("calls onAction with 'forceStop' when Force Stop is clicked", () => {
+        const onAction = vi.fn();
+        render(
+          <TaskDetailHeader {...defaultProps} status="running" onAction={onAction} />
+        );
+
+        const forceStopButton = screen.getByRole("button", { name: /force stop/i });
+        fireEvent.click(forceStopButton);
+
+        expect(onAction).toHaveBeenCalledWith("forceStop");
       });
     });
 
@@ -124,10 +138,10 @@ describe("TaskDetailHeader", () => {
       it("does not render any action button", () => {
         render(<TaskDetailHeader {...defaultProps} status="completed" />);
 
-        // Should have back button but no action buttons
         expect(screen.getByRole("button", { name: /back to tasks/i })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /run/i })).not.toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^stop$/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /force stop/i })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
       });
     });
@@ -136,10 +150,10 @@ describe("TaskDetailHeader", () => {
       it("does not render any action button", () => {
         render(<TaskDetailHeader {...defaultProps} status="closed" />);
 
-        // Should have back button but no action buttons
         expect(screen.getByRole("button", { name: /back to tasks/i })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /run/i })).not.toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^stop$/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /force stop/i })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
       });
     });

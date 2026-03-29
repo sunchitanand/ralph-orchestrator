@@ -6,7 +6,7 @@
  * Navigation items use React Router NavLink for proper routing.
  */
 
-import { ListTodo, PanelLeftClose, PanelLeft, Workflow, Settings, FolderOpen, Library } from "lucide-react";
+import { ListTodo, PanelLeftClose, PanelLeft, Workflow, Settings, FolderOpen, Library, RefreshCw } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { useUIStore } from "@/store";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ function RalphLogo({ className }: { className?: string }) {
 /** Navigation items configuration with route paths */
 const NAV_ITEMS = [
   { to: "/tasks", icon: ListTodo, label: "Tasks" },
+  { to: "/loops", icon: RefreshCw, label: "Loops" },
   { to: "/builder", icon: Workflow, label: "Builder" },
   { to: "/presets", icon: Library, label: "Presets" },
   { to: "/settings", icon: Settings, label: "Settings" },

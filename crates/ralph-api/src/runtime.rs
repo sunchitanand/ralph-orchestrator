@@ -34,6 +34,13 @@ pub(crate) struct IdOnlyParams {
     pub(crate) id: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TaskCancelParams {
+    pub(crate) id: String,
+    pub(crate) force: Option<bool>,
+}
+
 #[derive(Clone)]
 pub struct RpcRuntime {
     pub(crate) config: ApiConfig,
@@ -70,7 +77,10 @@ impl RpcRuntime {
         auth: Arc<dyn Authenticator>,
         idempotency: Arc<dyn IdempotencyStore>,
     ) -> Self {
-        let tasks = Arc::new(Mutex::new(TaskDomain::new(&config.workspace_root)));
+        let tasks = Arc::new(Mutex::new(TaskDomain::new(
+            &config.workspace_root,
+            config.ralph_command.clone(),
+        )));
         let loops = Arc::new(Mutex::new(LoopDomain::new(
             &config.workspace_root,
             config.loop_process_interval_ms,
