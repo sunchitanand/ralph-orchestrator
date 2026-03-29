@@ -44,7 +44,6 @@
         "loop.merge",
         "loop.merge_button_state",
         "loop.trigger_merge_task",
-        "loop.diff",
         "planning.list",
         "planning.get",
         "planning.start",
@@ -818,65 +817,6 @@
     },
     "requestByMethod": {
       "oneOf": [
-<<<<<<< HEAD
-        { "properties": { "method": { "const": "system.health" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "system.version" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "system.capabilities" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "task.list" }, "params": { "$ref": "#/$defs/taskListParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.get" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.ready" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.create" }, "params": { "$ref": "#/$defs/taskCreateParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.update" }, "params": { "$ref": "#/$defs/taskUpdateParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.close" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.archive" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.unarchive" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.delete" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.clear" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.run" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.run_all" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.retry" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.cancel" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "task.status" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "loop.list" }, "params": { "$ref": "#/$defs/loopListParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.status" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.process" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.prune" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.retry" }, "params": { "$ref": "#/$defs/loopRetryParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.discard" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.stop" }, "params": { "$ref": "#/$defs/loopStopMergeParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.merge" }, "params": { "$ref": "#/$defs/loopStopMergeParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.merge_button_state" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.trigger_merge_task" }, "params": { "$ref": "#/$defs/loopTriggerMergeTaskParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "loop.diff" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "planning.list" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "planning.get" }, "params": { "$ref": "#/$defs/planningSessionIdParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "planning.start" }, "params": { "$ref": "#/$defs/planningStartParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "planning.respond" }, "params": { "$ref": "#/$defs/planningRespondParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "planning.resume" }, "params": { "$ref": "#/$defs/planningSessionIdParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "planning.delete" }, "params": { "$ref": "#/$defs/planningSessionIdParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "planning.get_artifact" }, "params": { "$ref": "#/$defs/planningGetArtifactParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "config.get" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "config.update" }, "params": { "$ref": "#/$defs/configUpdateParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "preset.list" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "preset.get" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "collection.list" }, "params": { "$ref": "#/$defs/emptyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "collection.get" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "collection.create" }, "params": { "$ref": "#/$defs/collectionCreateParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "collection.update" }, "params": { "$ref": "#/$defs/collectionUpdateParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "collection.delete" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "collection.import" }, "params": { "$ref": "#/$defs/collectionImportParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "collection.export" }, "params": { "$ref": "#/$defs/idOnlyParams" } }, "required": ["method", "params"] },
-
-        { "properties": { "method": { "const": "stream.subscribe" }, "params": { "$ref": "#/$defs/streamSubscribeParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "stream.unsubscribe" }, "params": { "$ref": "#/$defs/streamUnsubscribeParams" } }, "required": ["method", "params"] },
-        { "properties": { "method": { "const": "stream.ack" }, "params": { "$ref": "#/$defs/streamAckParams" } }, "required": ["method", "params"] }
-=======
         {
           "properties": {
             "method": {
@@ -1619,7 +1559,6 @@
             "params"
           ]
         }
->>>>>>> ralph/zesty-jay
       ]
     },
     "requestEnvelope": {
@@ -1968,26 +1907,6 @@
         "taskId"
       ]
     },
-    "diffFile": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "path": { "type": "string" },
-        "status": { "type": "string" },
-        "additions": { "type": "integer", "minimum": 0 },
-        "deletions": { "type": "integer", "minimum": 0 },
-        "diff": { "type": "string" }
-      },
-      "required": ["path", "status", "additions", "deletions", "diff"]
-    },
-    "loopDiffResult": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "files": { "type": "array", "items": { "$ref": "#/$defs/diffFile" } }
-      },
-      "required": ["files"]
-    },
     "planningListResult": {
       "type": "object",
       "additionalProperties": false,
@@ -2143,65 +2062,6 @@
     },
     "responseByMethod": {
       "oneOf": [
-<<<<<<< HEAD
-        { "properties": { "method": { "const": "system.health" }, "result": { "$ref": "#/$defs/systemHealthResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "system.version" }, "result": { "$ref": "#/$defs/systemVersionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "system.capabilities" }, "result": { "$ref": "#/$defs/systemCapabilitiesResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "task.list" }, "result": { "$ref": "#/$defs/taskListResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.get" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.ready" }, "result": { "$ref": "#/$defs/taskListResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.create" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.update" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.close" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.archive" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.unarchive" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.delete" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.clear" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.run" }, "result": { "$ref": "#/$defs/taskRunResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.run_all" }, "result": { "$ref": "#/$defs/taskRunAllResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.retry" }, "result": { "$ref": "#/$defs/taskRunResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.cancel" }, "result": { "$ref": "#/$defs/taskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "task.status" }, "result": { "$ref": "#/$defs/taskStatusResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "loop.list" }, "result": { "$ref": "#/$defs/loopListResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.status" }, "result": { "$ref": "#/$defs/loopStatusResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.process" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.prune" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.retry" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.discard" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.stop" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.merge" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.merge_button_state" }, "result": { "$ref": "#/$defs/loopMergeButtonStateResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.trigger_merge_task" }, "result": { "$ref": "#/$defs/loopTriggerMergeTaskResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "loop.diff" }, "result": { "$ref": "#/$defs/loopDiffResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "planning.list" }, "result": { "$ref": "#/$defs/planningListResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "planning.get" }, "result": { "$ref": "#/$defs/planningSessionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "planning.start" }, "result": { "$ref": "#/$defs/planningSessionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "planning.respond" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "planning.resume" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "planning.delete" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "planning.get_artifact" }, "result": { "$ref": "#/$defs/artifactResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "config.get" }, "result": { "$ref": "#/$defs/configGetResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "config.update" }, "result": { "$ref": "#/$defs/configUpdateResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "preset.list" }, "result": { "$ref": "#/$defs/presetListResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "preset.get" }, "result": { "$ref": "#/$defs/collectionExportResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "collection.list" }, "result": { "$ref": "#/$defs/collectionListResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "collection.get" }, "result": { "$ref": "#/$defs/collectionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "collection.create" }, "result": { "$ref": "#/$defs/collectionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "collection.update" }, "result": { "$ref": "#/$defs/collectionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "collection.delete" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "collection.import" }, "result": { "$ref": "#/$defs/collectionResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "collection.export" }, "result": { "$ref": "#/$defs/collectionExportResult" } }, "required": ["method", "result"] },
-
-        { "properties": { "method": { "const": "stream.subscribe" }, "result": { "$ref": "#/$defs/streamSubscribeResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "stream.unsubscribe" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] },
-        { "properties": { "method": { "const": "stream.ack" }, "result": { "$ref": "#/$defs/successResult" } }, "required": ["method", "result"] }
-=======
         {
           "properties": {
             "method": {
@@ -2944,7 +2804,6 @@
             "result"
           ]
         }
->>>>>>> ralph/zesty-jay
       ]
     },
     "responseEnvelope": {

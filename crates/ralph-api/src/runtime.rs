@@ -276,7 +276,7 @@ impl RpcRuntime {
                 };
 
                 let domains = ProjectDomains {
-                    tasks: Arc::new(Mutex::new(TaskDomain::new(&workspace_root))),
+                    tasks: Arc::new(Mutex::new(TaskDomain::new(&workspace_root, self.config.ralph_command.clone()))),
                     loops: Arc::new(Mutex::new(LoopDomain::new(
                         &workspace_root,
                         self.config.loop_process_interval_ms,

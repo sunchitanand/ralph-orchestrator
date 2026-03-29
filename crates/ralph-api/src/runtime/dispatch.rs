@@ -143,14 +143,9 @@ impl RpcRuntime {
                 Ok(json!(result))
             }
             "task.cancel" => {
-<<<<<<< HEAD
                 let params: TaskCancelParams = self.parse_params(request)?;
                 let force = params.force.unwrap_or(false);
-                let task = self.task_domain_mut()?.cancel(&params.id, force)?;
-=======
-                let params: IdOnlyParams = self.parse_params(request)?;
-                let task = lock_tasks()?.cancel(&params.id)?;
->>>>>>> ralph/zesty-jay
+                let task = lock_tasks()?.cancel(&params.id, force)?;
                 Ok(json!({ "task": task }))
             }
             "task.status" => {
@@ -228,7 +223,7 @@ impl RpcRuntime {
             }
             "loop.diff" => {
                 let params: IdOnlyParams = self.parse_params(request)?;
-                let result = self.loop_domain_mut()?.diff(LoopDiffParams { id: params.id })?;
+                let result = lock_loops()?.diff(LoopDiffParams { id: params.id })?;
                 Ok(json!(result))
             }
             _ => Err(ApiError::service_unavailable(format!(
