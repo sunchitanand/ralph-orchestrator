@@ -87,6 +87,14 @@ export function TaskDetailPage() {
   // Fetch config for max_iterations
   const configQuery = trpc.config.get.useQuery();
 
+  // Derive max_iterations from config
+  const maxIterations = useMemo(() => {
+    const parsed = configQuery.data?.parsed;
+    const el = parsed?.event_loop as Record<string, unknown> | undefined;
+    const val = el?.max_iterations;
+    return typeof val === "number" ? val : null;
+  }, [configQuery.data?.parsed]);
+
   // Fetch loop diff when Changes tab is active
   const diffQuery = trpc.loops.diff.useQuery(
     { id: associatedLoop?.id ?? "" },
@@ -224,14 +232,6 @@ export function TaskDetailPage() {
     task.status === "completed" ||
     task.status === "closed" ||
     task.status === "failed";
-
-  // Derive max_iterations from config
-  const maxIterations = useMemo(() => {
-    const parsed = configQuery.data?.parsed;
-    const el = parsed?.event_loop as Record<string, unknown> | undefined;
-    const val = el?.max_iterations;
-    return typeof val === "number" ? val : null;
-  }, [configQuery.data?.parsed]);
 
   // Check if any action is pending
   const isActionPending =
