@@ -2,8 +2,12 @@
 
 ## Repo
 
-Fork: https://github.com/sunchitanand/ralph-orchestrator
+Standalone: https://github.com/sunchitanand/ralph
+Fork (for upstream sync): https://github.com/sunchitanand/ralph-orchestrator
+Upstream: https://github.com/mikeyobrien/ralph-orchestrator
 Clone and work from: ~/Documents/code/playground/ralph-orchestrator
+
+`git push origin main` pushes to both standalone and fork.
 
 ## What Ralph Is
 
